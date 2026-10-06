@@ -55,6 +55,12 @@ Saldo contoh dibagi menjadi Tunai Rp450.000, Bank Rp6.500.000, E-Wallet Rp1.500.
 Foto struk bersifat opsional (satu foto per catatan). Pilih berkas atau gunakan tombol Ambil foto; kamera langsung dibuka di dalam browser, dengan kamera belakang diprioritaskan pada HP. Pengguna mengizinkan akses kamera lalu menekan Jepret foto. Kamera dimatikan setelah foto diambil, panel ditutup, atau halaman disembunyikan. Akses kamera memerlukan HTTPS (atau localhost pada komputer yang sama); HTTP melalui alamat IP lokal di HP tidak dapat memakai kamera browser. JPG, PNG, dan WebP maksimal 10 MB diterima, diperkecil hingga sisi terpanjang 2400 piksel dan dikompresi sebagai JPEG sebelum disimpan bersama catatan. Pratinjau muncul otomatis, dapat diperbesar, diganti, atau dihapus sebelum menyimpan. Catatan yang memiliki foto menyediakan tombol Lihat struk. Foto juga disimpan hanya di browser per akun, mengikuti batas kapasitas penyimpanan browser; jika penyimpanan gagal, isian dan foto tetap tersedia untuk dicoba ulang atau disimpan tanpa foto. Fitur ini tidak melakukan OCR.
 
 
+## Syarat anggaran untuk pengeluaran
+
+Pengeluaran hanya dapat disimpan jika akun memiliki anggaran untuk kategori dan bulan tanggal transaksi yang dipilih. Tanpa anggaran yang sesuai, tombol simpan dinonaktifkan dan form mengarahkan pengguna ke menu Anggaran. Pemasukan tetap dapat dicatat tanpa anggaran. Ketentuan ini juga berlaku saat menyimpan perubahan pengeluaran atau mengubah pemasukan menjadi pengeluaran. Catatan lama tanpa anggaran tetap terlihat dan dapat dihapus; sebelum mengubahnya menjadi/menyimpan pengeluaran, atur anggaran yang sesuai.
+
+Penyimpanan memeriksa ulang anggaran terbaru per akun. Anggaran yang tidak dapat dibaca atau berubah saat form terbuka tidak boleh membuat pengeluaran tersimpan tanpa validasi; isian tetap tersedia ketika penyimpanan ditolak. Melewati batas nominal anggaran tetap berupa peringatan selama saldo dompet cukup.
+
 ## Anggaran (versi awal)
 
 Menu Anggaran membuka halaman /anggaran. Pilih bulan kalender, buat batas per kategori, lalu buka kategori untuk melihat pengeluaran, mengubah batas, atau mencatat pengeluaran dengan kategori dan periode terisi. Periode mendatang dapat direncanakan; catatan pengeluarannya baru tersedia saat periode dimulai. Satu kategori hanya memiliki satu batas per bulan; belum ada pengulangan otomatis atau penghapusan anggaran.

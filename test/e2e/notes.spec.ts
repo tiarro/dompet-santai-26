@@ -39,6 +39,15 @@ async function signIn(page: Page, id = userId) {
   await expect(page.getByTestId('page-title')).toHaveText('Dompet Santai')
 }
 
+async function seedExpenseBudgets(page: Page, categories = ['food']) {
+  await page.addInitScript(({ id, categories }) => {
+    const now = new Date()
+    const month = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0')
+    const key = 'dompet-santai-budgets-v1:' + id
+    if (!localStorage.getItem(key)) localStorage.setItem(key, JSON.stringify(categories.map(category => ({ month, category, limit: 1000000 }))))
+  }, { id: userId, categories })
+}
+
 async function openNote(page: Page) {
   await page.getByRole('button', { name: 'Tambah Catatan', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: 'Tambah Catatan' })
@@ -51,7 +60,7 @@ test('expense saves once, updates the dashboard, survives remount and supports u
     const date = new Date()
     const month = date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0')
     const key = 'dompet-santai-budgets-v1:00000000-0000-4000-8000-000000000123'
-    if (!localStorage.getItem(key)) localStorage.setItem(key, JSON.stringify([{ month, category: 'food', limit: 180000 }]))
+    if (!localStorage.getItem(key)) localStorage.setItem(key, JSON.stringify([{ month, category: 'food', limit: 180000 }, { month, category: 'transport', limit: 100000 }]))
   })
   await signIn(page)
   const dialog = await openNote(page)
@@ -86,6 +95,7 @@ test('expense saves once, updates the dashboard, survives remount and supports u
 })
 
 test('income categories, historical date and validation do not inflate today expenses', async ({ page }) => {
+  await seedExpenseBudgets(page, ["food"])
   await signIn(page)
   const dialog = await openNote(page)
   await dialog.getByRole('button', { name: 'Simpan Catatan' }).click()
@@ -108,6 +118,7 @@ test('income categories, historical date and validation do not inflate today exp
 })
 
 test('mobile sheet follows light and dark themes, traps focus and confirms discarded drafts', async ({ page }) => {
+  await seedExpenseBudgets(page, ["food"])
   await page.setViewportSize({ width: 390, height: 844 })
   await page.emulateMedia({ colorScheme: 'light' })
   await signIn(page)
@@ -138,6 +149,7 @@ test('mobile sheet follows light and dark themes, traps focus and confirms disca
 })
 
 test('storage failures keep the form open and never report a successful save', async ({ page }) => {
+  await seedExpenseBudgets(page, ["bills"])
   await signIn(page)
   const dialog = await openNote(page)
   await dialog.getByLabel('Nominal dalam rupiah').fill('25000')
@@ -166,6 +178,7 @@ test('desktop modal matches both themes without horizontal overflow', async ({ p
 
 
 test('saved notes are isolated between accounts on the same browser', async ({ page }) => {
+  await seedExpenseBudgets(page, ["food"])
   await signIn(page)
   const dialog = await openNote(page)
   await dialog.getByLabel('Nominal dalam rupiah').fill('15000')
@@ -189,6 +202,7 @@ test('unreadable saved data is reported and not overwritten', async ({ page }) =
 })
 
 test('wallet balances block unaffordable expenses, permit exact balances and never restrict income', async ({ page }) => {
+  await seedExpenseBudgets(page, ["food"])
   await page.setViewportSize({ width: 390, height: 844 })
   await signIn(page)
   const dialog = await openNote(page)
@@ -235,6 +249,7 @@ test('wallet balances block unaffordable expenses, permit exact balances and nev
 })
 
 test('saving checks the latest stored wallet balance even before a storage event arrives', async ({ page }) => {
+  await seedExpenseBudgets(page, ["food"])
   await signIn(page)
   const dialog = await openNote(page)
   await dialog.getByLabel('Nominal dalam rupiah').fill('50000')
@@ -277,6 +292,7 @@ async function receiptPhoto(page: Page, name = 'struk-belanja.png') {
 }
 
 test('optional receipt previews automatically, opens larger and persists with the saved note', async ({ page }) => {
+  await seedExpenseBudgets(page, ["food"])
   await signIn(page)
   const dialog = await openNote(page)
   await dialog.getByLabel('Nominal dalam rupiah').fill('25000')
@@ -307,6 +323,7 @@ test('optional receipt previews automatically, opens larger and persists with th
 })
 
 test('receipt selection supports upload, replacement, removal, validation and unsaved-photo confirmation', async ({ page }) => {
+  await seedExpenseBudgets(page, ["food"])
   await page.setViewportSize({ width: 390, height: 844 })
   await page.emulateMedia({ colorScheme: 'light' })
   await signIn(page)
@@ -341,6 +358,7 @@ test('receipt selection supports upload, replacement, removal, validation and un
 })
 
 test('failed photo storage preserves the draft and allows saving again without the attachment', async ({ page }) => {
+  await seedExpenseBudgets(page, ["food"])
   await signIn(page)
   const dialog = await openNote(page)
   await dialog.getByLabel('Nominal dalam rupiah').fill('10000')
@@ -367,6 +385,7 @@ test('failed photo storage preserves the draft and allows saving again without t
 test.describe('live receipt camera', () => {
 
   test('opens a real video stream, captures a frame and stops the camera after capture or cancellation', async ({ page }) => {
+    await seedExpenseBudgets(page, ['food'])
     await page.setViewportSize({ width: 390, height: 844 })
     await page.addInitScript(() => {
       const original = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices)
@@ -461,6 +480,115 @@ test.describe('live receipt camera', () => {
   })
 })
 
+
+for (const width of [1440, 390]) {
+  test('expense budget requirement blocks missing budgets and permits income at width ' + width, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 })
+    await signIn(page)
+    await page.addStyleTag({ content: '#nuxt-devtools-container { display: none !important; }' })
+    const dialog = await openNote(page)
+    const save = dialog.getByRole('button', { name: 'Simpan Catatan' })
+    await expect(dialog.locator('#note-budget-error')).toContainText('Belum ada anggaran')
+    await expect(save).toBeDisabled()
+    await dialog.getByLabel('Nominal dalam rupiah').fill('25000')
+    await dialog.getByRole('radio', { name: 'Makan & Minum' }).check()
+    await dialog.locator('form').evaluate(form => (form as HTMLFormElement).requestSubmit())
+    expect(await page.evaluate(key => localStorage.getItem(key), storageKey)).toBeNull()
+    await expect(dialog.getByLabel('Nominal dalam rupiah')).toHaveValue('25.000')
+
+    await dialog.getByRole('radio', { name: 'Pemasukan', exact: true }).check()
+    await dialog.getByRole('radio', { name: 'Gaji', exact: true }).check()
+    await expect(dialog.locator('#note-budget-error')).toHaveCount(0)
+    await save.click()
+    await expect(dialog).not.toBeVisible()
+    expect(await page.evaluate(key => JSON.parse(localStorage.getItem(key)!)[0].type, storageKey)).toBe('income')
+
+    await openBudgets(page)
+    await createBudget(page, 'food', '100000')
+    await page.getByRole('button', { name: 'Lihat anggaran Makan & Minum' }).click()
+    await page.getByRole('button', { name: 'Catat Pengeluaran', exact: true }).click()
+    await dialog.getByLabel('Nominal dalam rupiah').fill('25000')
+    await expect(save).toBeEnabled()
+    await save.click()
+    await expect(dialog).not.toBeVisible()
+    await expect(page.locator('.detail-card')).toContainText('75.000')
+    expect(await page.evaluate(key => JSON.parse(localStorage.getItem(key)!).map((note: any) => note.type), storageKey)).toEqual(['income', 'expense'])
+  })
+}
+
+test('expense budget requirement follows category, transaction month and account', async ({ page }) => {
+  await seedExpenseBudgets(page)
+  await signIn(page)
+  let dialog = await openNote(page)
+  const save = dialog.getByRole('button', { name: 'Simpan Catatan' })
+  await dialog.getByLabel('Nominal dalam rupiah').fill('25000')
+  await dialog.getByRole('radio', { name: 'Transportasi' }).check()
+  await expect(save).toBeDisabled()
+  await expect(dialog.locator('#note-budget-error')).toContainText('Kategori ini belum')
+  await dialog.getByRole('radio', { name: 'Makan & Minum' }).check()
+  await expect(save).toBeEnabled()
+  const today = await dialog.getByLabel('Tanggal').inputValue()
+  await dialog.getByLabel('Tanggal').fill('2020-01-01')
+  await expect(save).toBeDisabled()
+  await expect(dialog.locator('#note-budget-error')).toContainText('Belum ada anggaran')
+  await dialog.getByLabel('Tanggal').fill(today)
+  await expect(save).toBeEnabled()
+  await dialog.getByRole('button', { name: 'Tutup tambah catatan' }).click()
+  await dialog.getByRole('button', { name: 'Buang isian' }).click()
+  await signIn(page, '00000000-0000-4000-8000-000000000456')
+  dialog = await openNote(page)
+  await expect(dialog.getByRole('button', { name: 'Simpan Catatan' })).toBeDisabled()
+  await expect(dialog.locator('#note-budget-error')).toContainText('Belum ada anggaran')
+})
+
+test('expense budget requirement rereads storage and preserves drafts when budgets disappear or become unreadable', async ({ page }) => {
+  await seedExpenseBudgets(page)
+  await signIn(page)
+  const dialog = await openNote(page)
+  const save = dialog.getByRole('button', { name: 'Simpan Catatan' })
+  await dialog.getByLabel('Nominal dalam rupiah').fill('25000')
+  await dialog.getByRole('radio', { name: 'Makan & Minum' }).check()
+  const budgetKey = 'dompet-santai-budgets-v1:' + userId
+  const original = await page.evaluate(key => localStorage.getItem(key)!, budgetKey)
+  for (const raw of ['[]', 'invalid-json']) {
+    // No storage event: the form still has the initial budget, so persistence must recheck.
+    await page.evaluate(({ key, raw }) => localStorage.setItem(key, raw), { key: budgetKey, raw })
+    await expect(save).toBeEnabled()
+    await save.click()
+    await expect(dialog.locator('.save-error')).toContainText(raw === '[]' ? 'Belum ada anggaran' : 'Anggaran belum bisa dibaca')
+    await expect(dialog.getByLabel('Nominal dalam rupiah')).toHaveValue('25.000')
+    expect(await page.evaluate(key => localStorage.getItem(key), storageKey)).toBeNull()
+    expect(await page.evaluate(key => localStorage.getItem(key), budgetKey)).toBe(raw)
+    await page.evaluate(({ key, raw }) => localStorage.setItem(key, raw), { key: budgetKey, raw: original })
+  }
+  await save.click()
+  await expect(dialog).not.toBeVisible()
+  expect(await page.evaluate(key => JSON.parse(localStorage.getItem(key)!).length, storageKey)).toBe(1)
+})
+
+test('expense budget requirement handles unreadable budgets without blocking income or allowing conversion to expense', async ({ page }) => {
+  const budgetKey = 'dompet-santai-budgets-v1:' + userId
+  await page.addInitScript(key => localStorage.setItem(key, 'invalid-json'), budgetKey)
+  await signIn(page)
+  const dialog = await openNote(page)
+  await expect(dialog.locator('#note-budget-error')).toContainText('Anggaran di browser belum bisa dibaca')
+  await expect(dialog.getByRole('button', { name: 'Simpan Catatan' })).toBeDisabled()
+  await dialog.getByRole('radio', { name: 'Pemasukan', exact: true }).check()
+  await dialog.getByRole('radio', { name: 'Gaji', exact: true }).check()
+  await dialog.getByLabel('Nominal dalam rupiah').fill('25000')
+  await dialog.getByRole('button', { name: 'Simpan Catatan' }).click()
+  await page.getByRole('button', { name: 'Riwayat', exact: true }).click()
+  await page.locator('.history-row').click()
+  await page.getByRole('button', { name: 'Ubah Catatan', exact: true }).click()
+  const editor = page.getByRole('dialog', { name: 'Ubah Catatan', exact: true })
+  await editor.getByRole('radio', { name: 'Pengeluaran', exact: true }).check()
+  await editor.getByRole('radio', { name: 'Makan & Minum' }).check()
+  await expect(editor.getByRole('button', { name: 'Simpan Perubahan' })).toBeDisabled()
+  await editor.locator('form').evaluate(form => (form as HTMLFormElement).requestSubmit())
+  expect(await page.evaluate(key => JSON.parse(localStorage.getItem(key)!)[0].type, storageKey)).toBe('income')
+  expect(await page.evaluate(key => localStorage.getItem(key), budgetKey)).toBe('invalid-json')
+})
+
 async function openBudgets(page: Page) {
   await page.getByRole('button', { name: 'Anggaran', exact: true }).click()
   await expect(page).toHaveURL(/\/anggaran$/)
@@ -530,12 +658,13 @@ test('budgets create, reject duplicates, edit and follow expense saving and undo
   await openBudgets(page)
   await expect(page.getByText('Mulai atur anggaranmu')).toBeVisible()
 })
-test('budgets show unbudgeted spending and preserve draft after failed storage', async ({ page }) => {
+test('budgets show legacy unbudgeted spending and preserve draft after failed storage', async ({ page }) => {
+  await page.addInitScript(key => {
+    const now = new Date()
+    const date = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'), String(now.getDate()).padStart(2, '0')].join('-')
+    localStorage.setItem(key, JSON.stringify([{ id: 'legacy', type: 'expense', amount: 10000, category: 'bills', account: 'cash', date, description: '', createdAt: now.toISOString() }]))
+  }, storageKey)
   await signIn(page)
-  const dialog = await openNote(page)
-  await dialog.getByLabel('Nominal dalam rupiah').fill('10000')
-  await dialog.getByRole('radio', { name: 'Tagihan', exact: true }).check()
-  await dialog.getByRole('button', { name: 'Simpan Catatan' }).click()
   await openBudgets(page)
   await expect(page.locator('.unbudgeted')).toContainText('10.000')
   await expect(page.locator('.summary-metrics')).not.toContainText('10.000')
@@ -639,6 +768,8 @@ test('custom category creation validates names, separates income and preserves t
   expect(await note.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true)
   await note.getByRole('button', { name: 'Simpan Kategori', exact: true }).click()
   await expect(note.getByRole('radio', { name: 'PerawatanHewanDanKebutuhanHarian', exact: true })).toBeChecked()
+  await expect(note.getByRole('button', { name: 'Simpan Catatan' })).toBeDisabled()
+  await expect(note.locator('#note-budget-error')).toBeVisible()
   expect(await note.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true)
   await expect(note.getByLabel('Nominal dalam rupiah')).toHaveValue('50.000')
   await expect(note.getByLabel('Keterangan')).toHaveValue('Isian tetap ada')

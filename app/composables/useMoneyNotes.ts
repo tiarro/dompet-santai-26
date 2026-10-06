@@ -1,4 +1,5 @@
 import { defaultCategories as noteCategories, type CategoryCatalog } from '~/utils/categories'
+import { expenseBudgetError, readBudgets, type MonthlyBudget } from '~/utils/budgets'
 import { getAccountBalances, isNoteDraft, localDate, readNotes, reviseNote, type MoneyNote, type NoteDraft } from '~/utils/notes'
 
 // Browser-only first version, isolated by account. Keep separate from the unfinished database schema.
@@ -45,10 +46,23 @@ export function useMoneyNotes(getCategories: () => CategoryCatalog = () => noteC
     notes.value = next
   }
 
+  function requireExpenseBudget(draft: NoteDraft) {
+    if (draft.type !== 'expense') return
+    let budgets: MonthlyBudget[]
+    try {
+      budgets = readBudgets(localStorage.getItem('dompet-santai-budgets-v1:' + user.value!.sub), getCategories())
+    } catch {
+      throw new Error('Anggaran belum bisa dibaca. Muat ulang halaman sebelum menyimpan pengeluaran.')
+    }
+    const error = expenseBudgetError(draft, budgets)
+    if (error) throw new Error(error)
+  }
+
   function save(draft: NoteDraft) {
     if (!isNoteDraft(draft, getCategories()) || draft.date > localDate()) throw new Error('Periksa kembali nominal, kategori, rekening, dan tanggal catatan.')
     const note: MoneyNote = { ...draft, description: draft.description.trim(), id: crypto.randomUUID(), createdAt: new Date().toISOString() }
     persist(current => {
+      requireExpenseBudget(draft)
       const available = getAccountBalances(current, localDate())[draft.account] ?? 0
       if (draft.type === 'expense' && draft.amount > available) {
         throw new Error('Saldo sumber uang tidak cukup. Kurangi nominal atau pilih sumber uang lain.')
@@ -62,6 +76,7 @@ export function useMoneyNotes(getCategories: () => CategoryCatalog = () => noteC
     let result: MoneyNote | undefined
     persist(current => {
       const next = reviseNote(current, original, draft, localDate(), getCategories())
+      requireExpenseBudget(draft)
       result = next.find(note => note.id === original.id)
       return next
     })
