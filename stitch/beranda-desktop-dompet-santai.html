@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+
+<html lang="id"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Dompet Santai - Dashboard Desktop</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+                "inverse-on-surface": "#f0f1f2",
+                "primary": "#00685f",
+                "secondary-container": "#2170e4",
+                "error-container": "#ffdad6",
+                "primary-fixed-dim": "#6bd8cb",
+                "on-background": "#191c1d",
+                "surface-container": "#edeeef",
+                "inverse-primary": "#6bd8cb",
+                "surface-container-highest": "#e1e3e4",
+                "tertiary-fixed": "#6bff8f",
+                "on-error-container": "#93000a",
+                "on-primary-fixed-variant": "#005049",
+                "secondary-fixed": "#d8e2ff",
+                "on-secondary-fixed-variant": "#004395",
+                "background": "#f8f9fa",
+                "primary-container": "#008378",
+                "on-secondary-container": "#fefcff",
+                "primary-fixed": "#89f5e7",
+                "on-primary": "#ffffff",
+                "surface-container-low": "#f3f4f5",
+                "tertiary-fixed-dim": "#4ae176",
+                "on-primary-fixed": "#00201d",
+                "outline": "#6d7a77",
+                "secondary": "#0058be",
+                "surface-container-high": "#e7e8e9",
+                "surface-dim": "#d9dadb",
+                "on-tertiary-fixed-variant": "#005321",
+                "surface-bright": "#f8f9fa",
+                "on-surface-variant": "#3d4947",
+                "surface": "#f8f9fa",
+                "on-primary-container": "#f4fffc",
+                "on-tertiary-container": "#f7fff3",
+                "tertiary-container": "#00873b",
+                "on-tertiary": "#ffffff",
+                "error": "#ba1a1a",
+                "on-surface": "#191c1d",
+                "surface-container-lowest": "#ffffff",
+                "secondary-fixed-dim": "#adc6ff",
+                "inverse-surface": "#2e3132",
+                "on-secondary-fixed": "#001a42",
+                "on-secondary": "#ffffff",
+                "tertiary": "#006b2d",
+                "outline-variant": "#bcc9c6",
+                "on-tertiary-fixed": "#002109",
+                "on-error": "#ffffff",
+                "surface-variant": "#e1e3e4",
+                "surface-tint": "#006a61"
+        },
+        "borderRadius": {
+                "DEFAULT": "0.25rem",
+                "lg": "0.5rem",
+                "xl": "0.75rem",
+                "full": "9999px"
+        },
+        "spacing": {
+                "lg": "24px",
+                "xs": "4px",
+                "base": "8px",
+                "xl": "32px",
+                "md": "16px",
+                "sm": "12px",
+                "container-margin": "20px",
+                "gutter": "16px"
+        },
+        "fontFamily": {
+                "caption": [
+                        "Inter"
+                ],
+                "headline-lg": [
+                        "Inter"
+                ],
+                "headline-lg-mobile": [
+                        "Inter"
+                ],
+                "label-sm": [
+                        "Inter"
+                ],
+                "title-md": [
+                        "Inter"
+                ],
+                "display": [
+                        "Inter"
+                ],
+                "body-md": [
+                        "Inter"
+                ],
+                "body-lg": [
+                        "Inter"
+                ]
+        },
+        "fontSize": {
+                "caption": [
+                        "12px",
+                        {
+                                "lineHeight": "16px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "headline-lg": [
+                        "28px",
+                        {
+                                "lineHeight": "36px",
+                                "letterSpacing": "-0.01em",
+                                "fontWeight": "600"
+                        }
+                ],
+                "headline-lg-mobile": [
+                        "24px",
+                        {
+                                "lineHeight": "32px",
+                                "fontWeight": "600"
+                        }
+                ],
+                "label-sm": [
+                        "14px",
+                        {
+                                "lineHeight": "20px",
+                                "fontWeight": "500"
+                        }
+                ],
+                "title-md": [
+                        "20px",
+                        {
+                                "lineHeight": "28px",
+                                "fontWeight": "600"
+                        }
+                ],
+                "display": [
+                        "36px",
+                        {
+                                "lineHeight": "44px",
+                                "letterSpacing": "-0.02em",
+                                "fontWeight": "700"
+                        }
+                ],
+                "body-md": [
+                        "16px",
+                        {
+                                "lineHeight": "24px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "body-lg": [
+                        "18px",
+                        {
+                                "lineHeight": "28px",
+                                "fontWeight": "400"
+                        }
+                ]
+        }
+},
+    },
+  }
+</script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined.filled {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md min-h-screen flex">
+<!-- NavigationDrawer (Sidebar) -->
+<aside class="hidden lg:flex flex-col h-full py-xl bg-surface dark:bg-surface text-primary dark:text-primary-fixed-dim font-body-md text-body-md fixed left-0 top-0 w-[280px] border-r border-outline-variant/30 z-40">
+<!-- Header: Profile -->
+<div class="px-lg pb-xl flex items-center gap-md">
+<img class="w-12 h-12 rounded-full object-cover shadow-sm" data-alt="A clean, modern profile picture of a young professional in a brightly lit studio with a soft teal background. The portrait exudes warmth and approachability, aligning with a calm, friendly financial app aesthetic. Soft, natural lighting accentuates the subject's features." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDCq0YkRqEi3ufBkn8VdCMU3Sf8h4i-R0MEft4hWcx5uUDDY1TK3W6b_QdwobdFUhNpOpZTlfYsXQu5qQRmqR-Qxfc1V2Yr75bcTyLCPtya2A8HG9fH6RwKVzKV4MjWidmxW7X-dslt34_BIjasrgi9UPslw0CQngqG2LyWiJ1vXyQ1FUoGrT9nxstE80yVWBol-g8uozi5iqwKHIoDaq8dh3wFZuluCaEhP5KKQOp3jk_Xpj093AyR"/>
+<div>
+<h2 class="font-title-md text-title-md text-primary font-bold tracking-tight">Dompet Santai</h2>
+<p class="font-caption text-caption text-on-surface-variant">Halo, Sahabat Keuangan</p>
+</div>
+</div>
+<!-- Navigation Links -->
+<nav class="flex-1 flex flex-col gap-xs mt-md">
+<a class="flex items-center gap-md bg-primary-container/10 text-primary border-l-4 border-primary px-lg py-md hover:bg-surface-container-high transition-colors active:opacity-80" href="#">
+<span class="material-symbols-outlined filled">home</span>
+<span class="font-label-sm text-label-sm font-semibold">Beranda</span>
+</a>
+<a class="flex items-center gap-md text-on-surface-variant px-lg py-md hover:bg-surface-container-high transition-colors active:opacity-80" href="#">
+<span class="material-symbols-outlined">history</span>
+<span class="font-label-sm text-label-sm">Riwayat</span>
+</a>
+<a class="flex items-center gap-md text-on-surface-variant px-lg py-md hover:bg-surface-container-high transition-colors active:opacity-80" href="#">
+<span class="material-symbols-outlined">account_balance_wallet</span>
+<span class="font-label-sm text-label-sm">Anggaran</span>
+</a>
+<a class="flex items-center gap-md text-on-surface-variant px-lg py-md hover:bg-surface-container-high transition-colors active:opacity-80" href="#">
+<span class="material-symbols-outlined">savings</span>
+<span class="font-label-sm text-label-sm">Tabungan</span>
+</a>
+<a class="flex items-center gap-md text-on-surface-variant px-lg py-md hover:bg-surface-container-high transition-colors active:opacity-80" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-sm text-label-sm">Pengaturan</span>
+</a>
+</nav>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 lg:ml-[280px] p-lg md:p-xl flex flex-col gap-xl min-h-screen">
+<!-- Top App Bar -->
+<header class="flex justify-between items-center w-full pb-md border-b border-surface-variant">
+<div class="flex items-center gap-sm">
+<img class="w-10 h-10 rounded-full object-cover lg:hidden" data-alt="Profile avatar" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDCq0YkRqEi3ufBkn8VdCMU3Sf8h4i-R0MEft4hWcx5uUDDY1TK3W6b_QdwobdFUhNpOpZTlfYsXQu5qQRmqR-Qxfc1V2Yr75bcTyLCPtya2A8HG9fH6RwKVzKV4MjWidmxW7X-dslt34_BIjasrgi9UPslw0CQngqG2LyWiJ1vXyQ1FUoGrT9nxstE80yVWBol-g8uozi5iqwKHIoDaq8dh3wFZuluCaEhP5KKQOp3jk_Xpj093AyR"/>
+<div>
+<h1 class="font-headline-lg text-headline-lg text-on-surface font-semibold tracking-tight">Halo, User</h1>
+<p class="font-body-md text-body-md text-on-surface-variant mt-xs">Selamat pagi, kamu masih aman hari ini.</p>
+</div>
+</div>
+<div class="flex items-center gap-md">
+<button class="p-sm rounded-full hover:bg-surface-container-low transition-colors text-on-surface-variant">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="hidden lg:flex items-center gap-sm bg-primary text-on-primary px-lg py-md rounded-lg font-label-sm text-label-sm shadow-sm hover:bg-primary-container hover:text-on-primary-container transition-colors">
+<span class="material-symbols-outlined filled">add</span>
+                        Tambah Catatan
+                    </button>
+</div>
+</header>
+<!-- Summary Cards Bento Grid -->
+<section class="grid grid-cols-1 md:grid-cols-3 gap-md">
+<!-- Insight Card 1 -->
+<div class="bg-surface-container-lowest border border-surface-container-highest rounded-lg p-md flex flex-col justify-between gap-xl relative overflow-hidden group hover:shadow-sm transition-shadow">
+<div class="absolute -right-6 -top-6 w-24 h-24 bg-primary/5 rounded-full blur-2xl group-hover:bg-primary/10 transition-colors"></div>
+<div class="flex items-center gap-sm text-on-surface-variant z-10">
+<span class="material-symbols-outlined text-primary">account_balance_wallet</span>
+<h3 class="font-label-sm text-label-sm">Saldo Nyata</h3>
+</div>
+<div class="z-10">
+<p class="font-display text-display text-on-surface font-bold">Rp8.450.000</p>
+</div>
+</div>
+<!-- Insight Card 2 -->
+<div class="bg-primary border border-primary-container rounded-lg p-md flex flex-col justify-between gap-xl relative overflow-hidden hover:shadow-sm transition-shadow">
+<div class="absolute right-0 bottom-0 opacity-10 mix-blend-overlay">
+<svg fill="none" height="120" viewbox="0 0 100 100" width="120" xmlns="http://www.w3.org/2000/svg">
+<circle cx="50" cy="50" r="40" stroke="currentColor" stroke-width="12"></circle>
+</svg>
+</div>
+<div class="flex items-center gap-sm text-on-primary/80 z-10">
+<span class="material-symbols-outlined">verified_user</span>
+<h3 class="font-label-sm text-label-sm">Uang Aman Dipakai</h3>
+</div>
+<div class="z-10">
+<p class="font-display text-display text-on-primary font-bold">Rp2.150.000</p>
+<p class="font-caption text-caption text-on-primary/80 mt-xs flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">info</span> Sampai akhir bulan
+                        </p>
+</div>
+</div>
+<!-- Insight Card 3 -->
+<div class="bg-surface-container-lowest border border-surface-container-highest rounded-lg p-md flex flex-col justify-between gap-xl relative hover:shadow-sm transition-shadow">
+<div class="flex justify-between items-start">
+<div class="flex items-center gap-sm text-on-surface-variant">
+<span class="material-symbols-outlined text-error">receipt_long</span>
+<h3 class="font-label-sm text-label-sm">Pengeluaran Hari Ini</h3>
+</div>
+</div>
+<div>
+<p class="font-title-md text-title-md text-on-surface font-bold">Rp125.000</p>
+<p class="font-caption text-caption text-on-surface-variant mt-xs">Batas harian: Rp200.000</p>
+</div>
+</div>
+</section>
+<!-- Main Layout Area -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-lg lg:gap-xl">
+<!-- Left Column -->
+<section class="lg:col-span-8 flex flex-col gap-lg">
+<!-- Kondisi Anggaran -->
+<div class="flex flex-col gap-sm">
+<div class="flex justify-between items-end mb-sm">
+<h2 class="font-title-md text-title-md text-on-surface font-semibold tracking-tight">Kondisi Anggaran</h2>
+<button class="font-label-sm text-label-sm text-primary hover:underline">Lihat Semua</button>
+</div>
+<!-- Makan -->
+<div class="bg-surface-container-lowest border border-surface-container-highest rounded-lg p-md flex flex-col gap-sm hover:bg-surface-container-low transition-colors cursor-pointer">
+<div class="flex justify-between items-center">
+<div class="flex items-center gap-sm">
+<div class="w-8 h-8 rounded-full bg-tertiary-container/20 flex items-center justify-center text-tertiary">
+<span class="material-symbols-outlined text-[18px]">restaurant</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface font-medium">Makan &amp; Minum</span>
+</div>
+<span class="font-caption text-caption text-tertiary font-medium">Rp180.000 aman</span>
+</div>
+<div class="w-full bg-surface-container-low h-2 rounded-full overflow-hidden mt-xs">
+<div class="bg-tertiary h-full rounded-full w-[45%]"></div>
+</div>
+</div>
+<!-- Transport -->
+<div class="bg-surface-container-lowest border border-surface-container-highest rounded-lg p-md flex flex-col gap-sm hover:bg-surface-container-low transition-colors cursor-pointer">
+<div class="flex justify-between items-center">
+<div class="flex items-center gap-sm">
+<div class="w-8 h-8 rounded-full bg-secondary-container/10 flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-[18px]">directions_car</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface font-medium">Transportasi</span>
+</div>
+<span class="font-caption text-caption text-secondary font-medium">Tinggal Rp50.000</span>
+</div>
+<div class="w-full bg-surface-container-low h-2 rounded-full overflow-hidden mt-xs">
+<div class="bg-secondary h-full rounded-full w-[85%]"></div>
+</div>
+</div>
+<!-- Belanja Rumah -->
+<div class="bg-surface-container-lowest border border-error-container rounded-lg p-md flex flex-col gap-sm relative overflow-hidden hover:bg-surface-container-low transition-colors cursor-pointer">
+<div class="absolute inset-0 bg-error/5 mix-blend-multiply"></div>
+<div class="flex justify-between items-center relative z-10">
+<div class="flex items-center gap-sm">
+<div class="w-8 h-8 rounded-full bg-error-container/50 flex items-center justify-center text-error">
+<span class="material-symbols-outlined text-[18px]">shopping_cart</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface font-medium">Belanja Rumah</span>
+</div>
+<span class="font-caption text-caption text-error font-bold">Hampir habis</span>
+</div>
+<div class="w-full bg-surface-container-highest h-2 rounded-full overflow-hidden mt-xs relative z-10">
+<div class="bg-error h-full rounded-full w-[95%]"></div>
+</div>
+</div>
+</div>
+<!-- Weekly Summary -->
+<div class="bg-tertiary-container/10 border border-tertiary-container/20 rounded-lg p-md flex items-start gap-md mt-sm">
+<span class="material-symbols-outlined text-tertiary mt-1" style="font-variation-settings: 'FILL' 1;">emoji_events</span>
+<div>
+<h3 class="font-label-sm text-label-sm text-on-surface font-semibold">Ringkasan Mingguan</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mt-xs">Minggu ini kamu berhasil nabung <strong class="text-tertiary">Rp150.000</strong> dari sisa anggaran makan. Lanjutkan kebiasaan baik ini!</p>
+</div>
+</div>
+</section>
+<!-- Right Column -->
+<aside class="lg:col-span-4 flex flex-col gap-lg">
+<!-- Upcoming Bills -->
+<div class="bg-surface-container-lowest border border-surface-container-highest rounded-lg p-md flex flex-col gap-md">
+<h3 class="font-title-md text-title-md text-on-surface font-semibold tracking-tight">Tagihan Mendatang</h3>
+<ul class="flex flex-col gap-sm">
+<li class="flex justify-between items-center p-sm hover:bg-surface-container-low rounded-lg transition-colors cursor-pointer">
+<div class="flex items-center gap-sm">
+<div class="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center text-on-surface-variant">
+<span class="material-symbols-outlined">wifi</span>
+</div>
+<div>
+<p class="font-label-sm text-label-sm text-on-surface font-medium">Internet Rumah</p>
+<p class="font-caption text-caption text-on-surface-variant">Besok, 15 Okt</p>
+</div>
+</div>
+<span class="font-label-sm text-label-sm font-semibold text-on-surface">Rp350.000</span>
+</li>
+<li class="flex justify-between items-center p-sm hover:bg-surface-container-low rounded-lg transition-colors cursor-pointer">
+<div class="flex items-center gap-sm">
+<div class="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center text-on-surface-variant">
+<span class="material-symbols-outlined">bolt</span>
+</div>
+<div>
+<p class="font-label-sm text-label-sm text-on-surface font-medium">Listrik PLN</p>
+<p class="font-caption text-caption text-on-surface-variant">20 Okt</p>
+</div>
+</div>
+<span class="font-label-sm text-label-sm font-semibold text-on-surface">Rp200.000</span>
+</li>
+</ul>
+</div>
+<!-- Savings Goal -->
+<div class="bg-surface-container-lowest border border-surface-container-highest rounded-lg p-md flex flex-col gap-md">
+<div class="flex justify-between items-center">
+<h3 class="font-title-md text-title-md text-on-surface font-semibold tracking-tight">Target Tabungan</h3>
+<span class="material-symbols-outlined text-primary">flag</span>
+</div>
+<div class="flex flex-col items-center py-sm">
+<div class="relative w-32 h-32 flex items-center justify-center rounded-full bg-surface-container-low">
+<svg class="w-full h-full transform -rotate-90 absolute inset-0" viewbox="0 0 100 100">
+<circle class="text-surface-container-high" cx="50" cy="50" fill="none" r="45" stroke="currentColor" stroke-width="8"></circle>
+<circle class="text-primary" cx="50" cy="50" fill="none" r="45" stroke="currentColor" stroke-dasharray="282.7" stroke-dashoffset="107.4" stroke-linecap="round" stroke-width="8"></circle>
+</svg>
+<div class="text-center z-10 flex flex-col">
+<span class="font-display text-[28px] font-bold text-on-surface leading-none">62%</span>
+</div>
+</div>
+<div class="text-center mt-md">
+<p class="font-label-sm text-label-sm text-on-surface font-medium">Dana Darurat</p>
+<p class="font-caption text-caption text-on-surface-variant mt-xs">Terkumpul Rp6.200.000 dari Rp10.000.000</p>
+</div>
+</div>
+</div>
+</aside>
+</div>
+</main>
+<!-- Mobile FAB (Visible only on mobile if top bar button is hidden) -->
+<button class="lg:hidden fixed bottom-[96px] right-container-margin z-40 bg-primary text-on-primary rounded-full shadow-[0_4px_16px_rgba(0,0,0,0.12)] px-lg py-md flex items-center gap-sm hover:bg-primary-container hover:shadow-[0_6px_20px_rgba(0,0,0,0.15)] hover:-translate-y-1 active:scale-95 transition-all duration-200">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">add</span>
+<span class="font-label-sm text-label-sm font-semibold tracking-wide">Tambah Catatan</span>
+</button>
+<!-- Mobile Bottom Navigation (Visible only on mobile to satisfy JSON requirement conceptually) -->
+<nav class="lg:hidden fixed bottom-0 w-full z-50 flex justify-around items-center px-base py-sm bg-surface-container-lowest border-t border-outline-variant/30 rounded-t-xl font-label-sm text-label-sm shadow-[0_-4px_12px_rgba(0,0,0,0.02)]">
+<a class="flex flex-col items-center justify-center text-primary font-bold active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined filled">home</span>
+<span class="text-[10px] mt-1">Beranda</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:bg-surface-container p-2 rounded-lg transition-colors active:scale-90" href="#">
+<span class="material-symbols-outlined">history</span>
+<span class="text-[10px] mt-1">Riwayat</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:bg-surface-container p-2 rounded-lg transition-colors active:scale-90" href="#">
+<span class="material-symbols-outlined">account_balance_wallet</span>
+<span class="text-[10px] mt-1">Anggaran</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:bg-surface-container p-2 rounded-lg transition-colors active:scale-90" href="#">
+<span class="material-symbols-outlined">savings</span>
+<span class="text-[10px] mt-1">Tabungan</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:bg-surface-container p-2 rounded-lg transition-colors active:scale-90" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="text-[10px] mt-1">Setting</span>
+</a>
+</nav>
+<!-- Mobile FAB padding adjustment -->
+<div class="h-20 lg:hidden"></div>
+</body></html>
