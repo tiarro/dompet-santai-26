@@ -6,9 +6,14 @@ export default defineNuxtConfig({
   supabase: {
     redirect: false,
     types: '~~/shared/types/database.ts',
-    // Replaced automatically by NUXT_PUBLIC_SUPABASE_URL and
-    // NUXT_PUBLIC_SUPABASE_KEY when a local .env file is present.
-    url: 'https://placeholder.supabase.co',
-    key: 'placeholder-anon-key'
+    // Resolve environment values before falling back to demo configuration.
+    url: process.env.NUXT_PUBLIC_SUPABASE_URL
+      || process.env.SUPABASE_URL
+      || 'https://placeholder.supabase.co',
+    key: process.env.NUXT_PUBLIC_SUPABASE_KEY
+      || process.env.SUPABASE_KEY
+      || process.env.SUPABASE_PUBLISHABLE_KEY
+      || process.env.SUPABASE_ANON_KEY
+      || 'placeholder-anon-key'
   }
 })
