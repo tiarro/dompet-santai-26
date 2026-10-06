@@ -1,9 +1,19 @@
 import type { CategoryCatalog } from './categories'
-import { maxNoteAmount, noteAccounts, noteCategories, type MoneyNote } from './notes'
+import { maxNoteAmount, noteAccounts, noteCategories, validNoteDate, type MoneyNote, type NoteDraft } from './notes'
 
 export interface MonthlyBudget { month: string; category: string; limit: number; defaultAccount?: string }
 export type BudgetMode = 'create' | 'update'
 export type BudgetStatus = 'safe' | 'near-limit' | 'reached' | 'exceeded'
+
+export function expenseBudgetError(draft: Pick<NoteDraft, 'type' | 'category' | 'date'>, budgets: MonthlyBudget[]): string {
+  if (draft.type !== 'expense' || !validNoteDate(draft.date)) return ''
+  const monthly = budgets.filter(budget => budget.month === draft.date.slice(0, 7))
+  if (!monthly.length) return 'Belum ada anggaran untuk bulan transaksi ini. Atur anggaran melalui menu Anggaran sebelum mencatat pengeluaran.'
+  if (draft.category && !monthly.some(budget => budget.category === draft.category)) {
+    return 'Kategori ini belum memiliki anggaran untuk bulan transaksi yang dipilih. Atur anggaran melalui menu Anggaran terlebih dahulu.'
+  }
+  return ''
+}
 
 export function validBudgetMonth(value: unknown): value is string {
   return typeof value === 'string' && /^(19|[2-9]\d)\d{2}-(0[1-9]|1[0-2])$/.test(value)

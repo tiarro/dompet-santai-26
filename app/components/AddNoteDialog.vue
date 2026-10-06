@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import CategoryCreator from './CategoryCreator.vue'
 import type { CategoryCatalog, SaveCategory } from '~/utils/categories'
-import { categoryExpenses, type MonthlyBudget } from '~/utils/budgets'
+import { categoryExpenses, expenseBudgetError, type MonthlyBudget } from '~/utils/budgets'
 import ReceiptCamera from '~/components/ReceiptCamera.vue'
 import ReceiptViewer from '~/components/ReceiptViewer.vue'
 import { prepareReceipt, receiptAccept, type ReceiptAttachment } from '~/utils/receipts'
@@ -18,6 +18,8 @@ const props = defineProps<{
   accounts: Array<{ id: string; label: string; icon: string; balance: number }>
   defaultAccount?: string
   budgets?: MonthlyBudget[]
+  budgetsReady: boolean
+  budgetError?: string
   notes?: MoneyNote[]
 }>()
 const emit = defineEmits<{ saved: [note: MoneyNote]; updated: [note: MoneyNote] }>()
@@ -106,6 +108,11 @@ const selectedAccount = computed(() => formAccounts.value.find(item => item.id =
 const validAmount = computed(() => Number.isSafeInteger(amount.value) && amount.value > 0 && amount.value <= maxNoteAmount)
 const insufficientFunds = computed(() => props.ready && !editing.value && type.value === 'expense' && validAmount.value
   && !!selectedAccount.value && amount.value > selectedAccount.value.balance)
+const requiredBudgetError = computed(() => {
+  if (type.value !== 'expense') return ''
+  if (!props.budgetsReady) return props.budgetError || 'Menyiapkan anggaran sebelum pengeluaran dapat disimpan.'
+  return expenseBudgetError({ type: type.value, category: category.value, date: date.value }, props.budgets ?? [])
+})
 const budgetOverage = computed(() => {
   if (type.value !== 'expense' || !validAmount.value || !validNoteDate(date.value)) return 0
   const budget = props.budgets?.find(item => item.category === category.value && item.month === date.value.slice(0, 7))
@@ -220,7 +227,7 @@ function requestClose() {
 }
 
 function submit() {
-  if (saving.value || receiptBusy.value || categoryCreating.value || !props.ready || revisionError.value) return
+  if (saving.value || receiptBusy.value || categoryCreating.value || !props.ready || revisionError.value || requiredBudgetError.value) return
   attempted.value = true
   saveError.value = ''
   today.value = localDate()
@@ -396,7 +403,8 @@ defineExpose({ open, edit, close })
             <span>Saldo {{ selectedAccount?.label }} tidak cukup. Kurang <strong>{{ formatRupiah(amount - (selectedAccount?.balance ?? 0)) }}</strong>. Kurangi nominal atau pilih sumber uang lain.</span>
           </p>
           <p v-if="revisionError" id="note-revision-error" class="field-error" role="alert">{{ revisionError }}</p>
-          <button type="submit" class="save-note" :disabled="saving || receiptBusy || categoryCreating || !ready || insufficientFunds || !!revisionError" :aria-describedby="revisionError ? 'note-revision-error' : insufficientFunds ? 'note-funds-error' : undefined">
+          <p v-if="requiredBudgetError" id="note-budget-error" class="field-error" role="alert">{{ requiredBudgetError }}</p>
+          <button type="submit" class="save-note" :disabled="saving || receiptBusy || categoryCreating || !ready || insufficientFunds || !!revisionError || !!requiredBudgetError" :aria-describedby="requiredBudgetError ? 'note-budget-error' : revisionError ? 'note-revision-error' : insufficientFunds ? 'note-funds-error' : undefined">
             <span class="material-symbols-outlined" aria-hidden="true">check</span>
             {{ saving ? 'Menyimpan...' : editing ? 'Simpan Perubahan' : 'Simpan Catatan' }}
           </button>

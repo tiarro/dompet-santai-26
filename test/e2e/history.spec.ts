@@ -49,6 +49,7 @@ async function seedHistory(page: Page, mode = 'normal') {
     const previousDate = [previous.getFullYear(), String(previous.getMonth() + 1).padStart(2, '0'), String(previous.getDate()).padStart(2, '0')].join('-')
     const base = { type: 'expense', category: 'food', account: 'cash', date, amount: 10000, description: '', createdAt: date + 'T01:00:00Z' }
     if (mode === 'spent-income') {
+      localStorage.setItem('dompet-santai-budgets-v1:00000000-0000-4000-8000-000000000123', JSON.stringify([{ month: date.slice(0, 7), category: 'food', limit: 100000 }]))
       localStorage.setItem(key, JSON.stringify([
         { ...base, id: 'funding', type: 'income', category: 'salary', account: 'savings', amount: 100000, description: 'Dana tabungan' },
         { ...base, id: 'spent', account: 'savings', amount: 90000, description: 'Belanja tabungan' },
@@ -234,6 +235,11 @@ test('history preserves drafts on storage failure and rejects stale edits and de
   expect(await page.evaluate(key => JSON.parse(localStorage.getItem(key)!).find((note: any) => note.id === 'food').amount, storageKey)).toBe(35000)
 })
 test('history supports empty state, mobile filters and both themes', async ({ page }) => {
+  await page.addInitScript(() => {
+    const now = new Date()
+    const month = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0')
+    localStorage.setItem('dompet-santai-budgets-v1:00000000-0000-4000-8000-000000000123', JSON.stringify([{ month, category: 'food', limit: 100000 }]))
+  })
   await page.setViewportSize({ width: 390, height: 844 })
   await page.emulateMedia({ colorScheme: 'light' })
   await signIn(page)
