@@ -362,7 +362,7 @@ const desktopNavigation = [
       </HistoryOverview>
     </main>
     <ReceiptViewer ref="receiptViewer" />
-    <AddNoteDialog ref="noteDialog" :save="save" :update="update" :ready="ready && categoriesReady" :catalog="catalog" :save-category="saveCategory" :categories-ready="categoriesReady" :accounts="accounts" :default-account="latestAccount" :budgets="monthlyBudgets" :notes="notes" @saved="saved" @updated="updated" />
+    <AddNoteDialog ref="noteDialog" :save="save" :update="update" :ready="ready && categoriesReady" :catalog="catalog" :save-category="saveCategory" :categories-ready="categoriesReady" :accounts="accounts" :default-account="latestAccount" :budgets="monthlyBudgets" :budgets-ready="budgetsReady" :budget-error="budgetError" :notes="notes" @saved="saved" @updated="updated" />
     <div v-if="toast && !historyPage" class="note-toast">
       <div class="note-toast__row">
         <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>

@@ -1,10 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import { budgetStatus, isMonthlyBudget, readBudgets, setBudget, summarizeBudgets, validBudgetMonth } from '../../app/utils/budgets'
+import { expenseBudgetError, budgetStatus, isMonthlyBudget, readBudgets, setBudget, summarizeBudgets, validBudgetMonth } from '../../app/utils/budgets'
 import type { MoneyNote } from '../../app/utils/notes'
 
 const budget = { month: '2026-10', category: 'food', limit: 100000 }
 const note: MoneyNote = { id: '1', type: 'expense', amount: 25000, category: 'food', account: 'cash', date: '2026-10-05', description: '', createdAt: '2026-10-05T12:00:00Z' }
 describe('monthly budgets', () => {
+  it('requires a budget for the expense category and transaction month, while allowing income', () => {
+    expect(expenseBudgetError(note, [])).toContain('Belum ada anggaran')
+    expect(expenseBudgetError(note, [{ ...budget, month: '2026-09' }])).toContain('Belum ada anggaran')
+    expect(expenseBudgetError(note, [{ ...budget, category: 'transport' }])).toContain('Kategori ini belum')
+    expect(expenseBudgetError(note, [budget])).toBe('')
+    expect(expenseBudgetError({ ...note, date: '2026-09-30' }, [budget])).toContain('Belum ada anggaran')
+    expect(expenseBudgetError({ ...note, type: 'income', category: 'salary' }, [])).toBe('')
+    expect(expenseBudgetError({ ...note, category: 'custom-pets' }, [{ ...budget, category: 'custom-pets' }])).toBe('')
+  })
   it('accepts only valid months, expense categories and integer limits', () => {
     expect(isMonthlyBudget(budget)).toBe(true)
     for (const month of ['', '2026-00', '2026-13', '2026-1', '2026-10-01', '1899-12']) expect(validBudgetMonth(month)).toBe(false)
