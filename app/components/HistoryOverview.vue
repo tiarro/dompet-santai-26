@@ -6,7 +6,7 @@ import { formatRupiah } from '~/utils/currency'
 import ReceiptViewer from './ReceiptViewer.vue'
 const props = defineProps<{
   notes: MoneyNote[]; catalog: CategoryCatalog; today: string; ready: boolean; error: string
-  remove: (note: MoneyNote) => void
+  remove: (note: MoneyNote) => void | Promise<void>
 }>()
 const emit = defineEmits<{ edit: [note: MoneyNote]; add: []; deleted: [note: MoneyNote] }>()
 const period = ref<HistoryPeriod>('this-month')
@@ -109,12 +109,12 @@ function afterUpdate(note: MoneyNote) {
     confirmDelete.value = false; deleteError.value = ''
   }
 }
-function deleteNote() {
+async function deleteNote() {
   if (!detail.value || busy.value || stale.value || !props.ready) return
   busy.value = true; deleteError.value = ''
   const original = detail.value
   try {
-    props.remove(original)
+    await props.remove(original)
     closeDetail()
     pageNotice.value = 'Catatan berhasil dihapus.'
     emit('deleted', original)
@@ -128,7 +128,7 @@ defineExpose({ afterUpdate, close: () => closeDetail(false) })
 
 <template>
   <section class="history-page">
-    <header class="history-heading"><div><p class="eyebrow">Setiap catatan punya cerita</p><h2>Riwayat</h2><p>Telusuri pemasukan dan pengeluaranmu, satu per satu.</p></div><span class="local-label">Tersimpan di browser ini</span></header>
+    <header class="history-heading"><div><p class="eyebrow">Setiap catatan punya cerita</p><h2>Riwayat</h2><p>Telusuri pemasukan dan pengeluaranmu, satu per satu.</p></div></header>
     <slot name="notification" />
     <div class="history-toolbar">
       <div class="field period-field"><label for="history-period">Periode riwayat</label><select id="history-period" v-model="period"><option v-for="(label, value) in periodLabels" :key="value" :value="value">{{ label }}</option></select></div>
@@ -175,7 +175,7 @@ defineExpose({ afterUpdate, close: () => closeDetail(false) })
         <p class="detail-kind">{{ detail.type === 'income' ? 'Pemasukan' : 'Pengeluaran' }}</p>
         <p class="detail-amount" :class="{ income: detail.type === 'income' }">{{ detail.type === 'income' ? '+' : '\u2212' }}{{ formatRupiah(detail.amount) }}</p>
         <dl><div><dt>Kategori</dt><dd>{{ categoryFor(detail).label }}</dd></div><div><dt>{{ detail.type === 'income' ? 'Masuk ke' : 'Bayar dari' }}</dt><dd>{{ noteAccounts.find(item => item.id === detail?.account)?.label }}</dd></div><div><dt>Tanggal</dt><dd>{{ fullDate(detail.date) }}</dd></div><div><dt>Keterangan</dt><dd>{{ detail.description || 'Tanpa keterangan' }}</dd></div></dl>
-        <button v-if="detail.receipt" class="receipt-button" @click="receiptViewer?.open(detail.receipt)"><img :src="detail.receipt.dataUrl" alt="Foto struk transaksi"><span><span class="material-symbols-outlined" aria-hidden="true">zoom_in</span>Lihat struk</span></button>
+        <button v-if="detail.receipt" class="receipt-button" @click="receiptViewer?.open(detail.receipt)"><img v-if="detail.receipt.dataUrl" :src="detail.receipt.dataUrl" alt="Foto struk transaksi"><span><span class="material-symbols-outlined" aria-hidden="true">zoom_in</span>Lihat struk</span></button>
         <p v-if="notice" class="success" role="status">{{ notice }}</p>
         <p v-if="stale" class="error" role="alert">Catatan sudah berubah atau dihapus. Tutup detail lalu buka kembali dari daftar terbaru.</p>
         <p v-if="deleteError" class="error" role="alert">{{ deleteError }}</p>
@@ -198,7 +198,6 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .history-heading h2 { margin: .35rem 0 .6rem; font-size: clamp(1.8rem, 4vw, 2.4rem); letter-spacing: -.04em; }
 .history-heading p { color: var(--muted); font-size: .85rem; line-height: 1.6; }
 .history-heading .eyebrow { color: var(--teal); font-size: .7rem; font-weight: 800; letter-spacing: .04em; }
-.local-label { flex: none; color: var(--muted); font-size: .7rem; border: 1px solid var(--line); padding: .4rem .65rem; border-radius: 999px; }
 .history-toolbar { display: grid; grid-template-columns: minmax(10rem, 1fr) minmax(12rem, 2fr); gap: 1rem; align-items: end; }
 .field { display: grid; gap: .5rem; min-width: 0; }
 .field label { color: var(--muted); font-size: .75rem; font-weight: 700; }

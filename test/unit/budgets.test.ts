@@ -1,10 +1,31 @@
 import { describe, expect, it } from 'vitest'
-import { expenseBudgetError, budgetStatus, isMonthlyBudget, readBudgets, setBudget, summarizeBudgets, validBudgetMonth } from '../../app/utils/budgets'
+import { requiredExpenseAccount, budgetAccountError, expenseBudgetError, budgetStatus, isMonthlyBudget, readBudgets, setBudget, summarizeBudgets, validBudgetMonth } from '../../app/utils/budgets'
 import type { MoneyNote } from '../../app/utils/notes'
 
 const budget = { month: '2026-10', category: 'food', limit: 100000 }
 const note: MoneyNote = { id: '1', type: 'expense', amount: 25000, category: 'food', account: 'cash', date: '2026-10-05', description: '', createdAt: '2026-10-05T12:00:00Z' }
 describe('monthly budgets', () => {
+  it('requires the budget wallet for new expenses except the Other category', () => {
+    const budgets = [{ ...budget, defaultAccount: 'bank' }, { ...budget, month: '2026-09', defaultAccount: 'ewallet' }]
+    expect(requiredExpenseAccount(note, budgets)).toBe('bank')
+    expect(requiredExpenseAccount({ ...note, date: '2026-09-30' }, budgets)).toBe('ewallet')
+    expect(requiredExpenseAccount(note, [budget])).toBeUndefined()
+    expect(requiredExpenseAccount({ ...note, category: 'other' }, [{ ...budget, category: 'other', defaultAccount: 'cash' }])).toBeUndefined()
+    expect(requiredExpenseAccount({ ...note, type: 'income' }, budgets)).toBeUndefined()
+    expect(requiredExpenseAccount({ ...note, category: 'custom-pets' }, [{ ...budget, category: 'custom-pets', defaultAccount: 'cash' }])).toBe('cash')
+  })
+  it('requires the selected wallet to cover a budget, including exact and zero balances', () => {
+    const balances = { cash: 450000, bank: 6500000, ewallet: 1500000, savings: 0 }
+    for (const [defaultAccount, balance] of Object.entries(balances)) {
+      expect(budgetAccountError({ limit: balance + 1, defaultAccount }, balances)).toContain('lebih kecil')
+      if (balance > 0) {
+        expect(budgetAccountError({ limit: balance, defaultAccount }, balances)).toBe('')
+        expect(budgetAccountError({ limit: balance - 1, defaultAccount }, balances)).toBe('')
+      }
+    }
+    expect(budgetAccountError({ limit: 9000000 }, balances)).toBe('')
+    expect(budgetAccountError({ limit: 1, defaultAccount: 'missing' }, balances)).toContain('belum tersedia')
+  })
   it('requires a budget for the expense category and transaction month, while allowing income', () => {
     expect(expenseBudgetError(note, [])).toContain('Belum ada anggaran')
     expect(expenseBudgetError(note, [{ ...budget, month: '2026-09' }])).toContain('Belum ada anggaran')

@@ -16,11 +16,11 @@ export const defaultCategories = {
 }
 
 export type CategoryType = 'expense' | 'income'
-export interface NoteCategory { id: string; label: string; icon: string }
+export interface NoteCategory { id: string; label: string; icon: string; archived?: boolean }
 export type CategoryCatalog = Record<CategoryType, NoteCategory[]>
 export interface CustomCategory extends NoteCategory { type: CategoryType }
 export type CategoryDraft = Omit<CustomCategory, 'id'>
-export type SaveCategory = (draft: CategoryDraft) => CustomCategory
+export type SaveCategory = (draft: CategoryDraft) => CustomCategory | Promise<CustomCategory>
 
 export const categoryIcons = [
   { id: 'category', label: 'Umum' },
@@ -65,7 +65,10 @@ export function readCategories(raw: string | null): CustomCategory[] {
   let result: CustomCategory[] = []
   for (const row of rows) {
     if (!row || typeof row !== 'object') throw new Error('Invalid saved category')
-    result = addCategory(result, row as CustomCategory, (row as CustomCategory).id)
+    const category = row as CustomCategory
+    if (category.archived !== undefined && typeof category.archived !== 'boolean') throw new Error('Invalid category status')
+    result = addCategory(result, category, category.id)
+    if (category.archived) result[result.length - 1]!.archived = true
   }
   return result
 }

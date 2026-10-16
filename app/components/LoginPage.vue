@@ -1,5 +1,6 @@
 <script setup lang="ts">
 const supabase = useSupabaseClient();
+const user = useSupabaseUser();
 const router = useRouter();
 
 const props = withDefaults(defineProps<{ mode?: 'login' | 'register' }>(), { mode: 'login' });
@@ -86,17 +87,27 @@ const getErrorMessage = (error: unknown, fallback: string) => {
 };
 
 const signIn = async () => {
+  if (isSubmitting.value) return;
   errorMessage.value = "";
   noticeMessage.value = "";
   isSubmitting.value = true;
 
   try {
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email: email.value.trim(),
       password: password.value,
     });
 
     if (error) throw error;
+    if (!data.session) throw new Error('Sesi login belum tersedia. Silakan coba lagi.');
+
+    // The Nuxt auth listener resolves claims asynchronously. On HTTP LAN origins,
+    // verification needs a network request; finish it before the home page guard runs.
+    const { data: verified, error: verificationError } = await supabase.auth.getClaims(data.session.access_token);
+    if (verificationError || !verified?.claims) {
+      throw new Error('Sesi login belum dapat diverifikasi. Periksa koneksi internet lalu coba lagi.');
+    }
+    user.value = verified.claims;
     await router.push("/");
   } catch (error) {
     errorMessage.value = getErrorMessage(
@@ -104,6 +115,29 @@ const signIn = async () => {
       "Email atau kata sandi belum benar.",
     );
   } finally {
+    isSubmitting.value = false;
+  }
+};
+
+const signInWithGoogle = async () => {
+  if (isSubmitting.value) return;
+  errorMessage.value = "";
+  noticeMessage.value = "";
+  isSubmitting.value = true;
+
+  try {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: new URL('/auth/callback', window.location.origin).href,
+      },
+    });
+    if (error) throw error;
+  } catch (error) {
+    errorMessage.value = getErrorMessage(
+      error,
+      'Login dengan Google belum berhasil. Periksa konfigurasi Google di Supabase lalu coba lagi.',
+    );
     isSubmitting.value = false;
   }
 };
@@ -287,17 +321,17 @@ const sendPasswordReset = async () => {
           </button>
         </form>
 
-        <div v-if="!isRegister" class="divider"><span>atau</span></div>
+        <div class="divider"><span>atau</span></div>
 
         <button
-          v-if="!isRegister"
           class="google-button"
           type="button"
-          disabled
-          title="Login Google segera hadir"
+          :disabled="isSubmitting"
+          :aria-label="isRegister ? 'Daftar dengan Google' : 'Masuk dengan Google'"
+          @click="signInWithGoogle"
         >
           <span class="google-logo" aria-hidden="true">G</span>
-          <span>Masuk dengan Google</span>
+          <span>{{ isRegister ? 'Daftar dengan Google' : 'Masuk dengan Google' }}</span>
         </button>
 
         <p class="signup-copy">

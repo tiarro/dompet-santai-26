@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import CategoryCreator from './CategoryCreator.vue'
 import type { CategoryCatalog, SaveCategory } from '~/utils/categories'
-import { summarizeBudgets, budgetStatusLabels, validBudgetMonth, type MonthlyBudget, type BudgetMode } from '~/utils/budgets'
+import { budgetAccountError, summarizeBudgets, budgetStatusLabels, validBudgetMonth, type MonthlyBudget, type BudgetMode } from '~/utils/budgets'
 import { noteAccounts, maxNoteAmount, type MoneyNote } from '~/utils/notes'
 import { formatRupiah } from '~/utils/currency'
 import ReceiptViewer from './ReceiptViewer.vue'
+import BudgetMonthInput from './BudgetMonthInput.vue'
 
 const props = defineProps<{
   accounts: Array<{ id: string; label: string; balance: number }>
@@ -16,13 +17,25 @@ const props = defineProps<{
   today: string
   ready: boolean
   error: string
-  save: (draft: MonthlyBudget, mode: BudgetMode) => void
+  save: (draft: MonthlyBudget, mode: BudgetMode) => void | Promise<void>
 }>()
 const emit = defineEmits<{ expense: [category: string, month: string] }>()
 const month = ref(props.today.slice(0, 7))
 const summary = computed(() => summarizeBudgets(props.budgets, props.notes, month.value, props.today, props.catalog))
 const selected = ref('')
 const detail = computed(() => summary.value.allocated.find(item => item.id === selected.value))
+const route = useRoute()
+const router = useRouter()
+onMounted(() => watch([() => route.query.category, () => props.ready], async () => {
+  const id = route.query.category
+  if (typeof id !== 'string' || !props.ready) return
+  month.value = props.today.slice(0, 7)
+  if (summary.value.allocated.some(item => item.id === id)) selected.value = id
+  const query = { ...route.query }; delete query.category
+  await router.replace({ query })
+  await nextTick()
+  document.getElementById('notification-budget-detail')?.focus()
+}, { immediate: true, flush: 'post' }))
 const receiptViewer = ref<InstanceType<typeof ReceiptViewer> | null>(null)
 const monthLabel = computed(() => validBudgetMonth(month.value)
   ? new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' }).format(new Date(month.value + '-01T12:00:00'))
@@ -37,6 +50,12 @@ const categoryCreating = ref(false)
 const draftMonth = ref('')
 const draftLimit = ref('')
 const draftAccount = ref('')
+const limitAmount = computed(() => /^\d[\d.]*$/.test(draftLimit.value) ? Number(draftLimit.value.replaceAll('.', '')) : NaN)
+const accountError = computed(() => props.ready ? budgetAccountError(
+  { limit: limitAmount.value, defaultAccount: draftAccount.value },
+  Object.fromEntries(props.accounts.map(account => [account.id, account.balance])),
+) : '')
+const saving = ref(false)
 const formError = ref('')
 const confirmDiscard = ref(false)
 const notice = ref('')
@@ -69,13 +88,14 @@ function closeEditor() {
   document.body.style.overflow = previousOverflow
 }
 function requestClose() {
+  if (saving.value) return
   if (snapshot() !== initialDraft || categoryDraftDirty.value) confirmDiscard.value = true
   else closeEditor()
 }
-function submit() {
-  if (categoryCreating.value) return
+async function submit() {
+  if (saving.value || !props.ready || categoryCreating.value || accountError.value) return
   formError.value = ''
-  const limit = /^\d[\d.]*$/.test(draftLimit.value) ? Number(draftLimit.value.replaceAll('.', '')) : NaN
+  const limit = limitAmount.value
   if (!props.catalog.expense.some(item => item.id === draftCategory.value)) {
     formError.value = 'Pilih kategori anggaran.'; return
   }
@@ -83,8 +103,9 @@ function submit() {
   if (!Number.isSafeInteger(limit) || limit <= 0 || limit > maxNoteAmount) {
     formError.value = 'Isi batas Rp1 sampai Rp999.999.999.999, tanpa desimal.'; return
   }
+  saving.value = true
   try {
-    props.save({ month: draftMonth.value, category: draftCategory.value, limit,
+    await props.save({ month: draftMonth.value, category: draftCategory.value, limit,
       ...(draftAccount.value ? { defaultAccount: draftAccount.value } : {}),
     }, mode.value)
     month.value = draftMonth.value
@@ -92,12 +113,7 @@ function submit() {
     closeEditor()
   } catch (error) {
     formError.value = error instanceof Error ? error.message : 'Anggaran belum tersimpan. Coba lagi.'
-  }
-}
-function selectMonth(event: Event) {
-  const input = event.target as HTMLInputElement
-  if (validBudgetMonth(input.value)) month.value = input.value
-  else input.value = month.value
+  } finally { saving.value = false }
 }
 watch(month, () => { selected.value = ''; notice.value = ''; receiptViewer.value?.close() })
 onBeforeUnmount(closeEditor)
@@ -109,9 +125,13 @@ onBeforeUnmount(closeEditor)
       <div><p class="eyebrow">Rencana kecil, langkah lebih tenang</p><h2>Anggaran</h2><p>Atur batas pengeluaran bulanan sesuai kebutuhanmu.</p></div>
       <button class="primary" :disabled="!ready" @click="openEditor()"><span class="material-symbols-outlined" aria-hidden="true">add</span>Buat Anggaran</button>
     </header>
+    <aside class="budget-warning" role="note" aria-label="Peringatan anggaran">
+      <span class="material-symbols-outlined" aria-hidden="true">warning</span>
+      <div><strong>Perhatian</strong><p>Anggaran membantu memantau pengeluaran dan tidak mengurangi saldo dompet. Batas yang terlewati akan diberi peringatan.</p></div>
+    </aside>
     <div class="period-row">
-      <label for="budget-period">Periode <input id="budget-period" type="month" :value="month" min="1900-01" max="9999-12" @change="selectMonth"></label>
-      <span class="local-label"><span class="material-symbols-outlined" aria-hidden="true">devices</span>Tersimpan di browser ini</span>
+      <label for="budget-period">Periode <BudgetMonthInput id="budget-period" v-model="month" /></label>
+
     </div>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <p v-else-if="!ready" role="status">Memuat anggaran dan catatan...</p>
@@ -119,7 +139,7 @@ onBeforeUnmount(closeEditor)
       <p v-if="notice" class="success" role="status">{{ notice }}</p>
       <template v-if="detail">
         <button class="text-button back" @click="selected = ''"><span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>Semua anggaran</button>
-        <section class="detail-card">
+        <section id="notification-budget-detail" class="detail-card" tabindex="-1">
           <div class="section-title"><div class="category-title"><span class="category-icon material-symbols-outlined" aria-hidden="true">{{ detail.icon }}</span><div><h3>{{ detail.label }}</h3><p>{{ monthLabel }}</p></div></div><span class="status" :class="detail.status!">{{ budgetStatusLabels[detail.status!] }}</span></div>
           <div class="metrics detail-metrics">
             <div><span>Batas anggaran</span><strong>{{ formatRupiah(detail.limit) }}</strong></div>
@@ -160,29 +180,29 @@ onBeforeUnmount(closeEditor)
           <div v-for="item in summary.unbudgeted" :key="item.id" class="unbudgeted-row"><span>{{ item.label }}</span><strong>{{ formatRupiah(item.spent) }}</strong><button class="secondary" @click="openEditor(item.id)">Atur Anggaran<span class="sr-only"> {{ item.label }}</span></button></div>
         </section>
       </template>
-      <p class="footnote">Anggaran membantu memantau pengeluaran dan tidak mengurangi saldo dompet. Batas yang terlewati akan diberi peringatan.</p>
     </template>
     <dialog ref="editor" class="budget-editor" :aria-label="mode === 'create' ? 'Buat Anggaran' : 'Ubah Anggaran'" @cancel.prevent="requestClose">
       <header class="section-title"><h2 id="budget-editor-title">{{ mode === 'create' ? 'Buat Anggaran' : 'Ubah Anggaran' }}</h2><button class="close-button" aria-label="Tutup form anggaran" @click="requestClose"><span class="material-symbols-outlined" aria-hidden="true">close</span></button></header>
       <p class="muted">Tentukan batas yang nyaman untuk satu kategori.</p>
       <form novalidate @submit.prevent="submit">
-        <div class="budget-field"><label for="budget-category">Kategori</label><select id="budget-category" ref="firstInput" v-model="draftCategory" :disabled="mode === 'update'" required><option value="" disabled>Pilih kategori</option><option v-for="item in catalog.expense" :key="item.id" :value="item.id">{{ item.label }}</option></select></div>
+        <div class="budget-field"><label for="budget-category">Kategori</label><select id="budget-category" ref="firstInput" v-model="draftCategory" :disabled="mode === 'update'" required><option value="" disabled>Pilih kategori</option><option v-for="item in catalog.expense.filter(item => !item.archived || item.id === draftCategory)" :key="item.id" :value="item.id">{{ item.label }}</option></select></div>
         <CategoryCreator v-if="mode === 'create'" ref="categoryCreator" type="expense" :save="saveCategory" :ready="categoriesReady" @created="draftCategory = $event.id" @dirty="categoryDraftDirty = $event" @editing="categoryCreating = $event" />
-        <label for="budget-month">Bulan anggaran<input id="budget-month" v-model="draftMonth" type="month" min="1900-01" max="9999-12" :disabled="mode === 'update'" required></label>
+        <label for="budget-month">Bulan anggaran<BudgetMonthInput id="budget-month" v-model="draftMonth" :disabled="mode === 'update'" required /></label>
         <label for="budget-limit">Batas anggaran (Rp)<input id="budget-limit" v-model="draftLimit" type="text" inputmode="numeric" autocomplete="off" maxlength="20" placeholder="Contoh: 500000" required></label>
         <div class="budget-field">
           <label for="budget-default-account">Biasanya bayar dari (opsional)</label>
-          <select id="budget-default-account" v-model="draftAccount" aria-describedby="budget-default-account-help">
+          <select id="budget-default-account" v-model="draftAccount" :aria-invalid="!!accountError" :aria-describedby="accountError ? 'budget-default-account-help budget-account-error' : 'budget-default-account-help'">
             <option value="">Tanpa pilihan default</option>
             <option v-if="draftAccount && !accounts.some(account => account.id === draftAccount)" :value="draftAccount" disabled>{{ noteAccounts.find(account => account.id === draftAccount)?.label }} (tidak tersedia)</option>
             <option v-for="account in accounts" :key="account.id" :value="account.id">{{ account.label }} &middot; {{ formatRupiah(account.balance) }}</option>
           </select>
           <p id="budget-default-account-help" class="muted">Dompet otomatis terpilih saat mencatat pengeluaran kategori ini. Kamu tetap bisa menggantinya. Mengatur pilihan ini tidak mengurangi saldo.</p>
         </div>
+        <p v-if="accountError" id="budget-account-error" class="error" role="alert">{{ accountError }}</p>
         <p v-if="duplicate" class="error" role="alert">Kategori ini sudah memiliki anggaran pada periode tersebut. Gunakan Ubah Anggaran.</p>
         <p v-if="formError" class="error" role="alert">{{ formError }}</p>
         <div v-if="confirmDiscard" class="discard"><p>Isian belum disimpan. Tutup dan buang isian?</p><div class="detail-actions"><button type="button" class="secondary" @click="confirmDiscard = false">Lanjut mengisi</button><button type="button" class="secondary" @click="closeEditor">Buang isian</button></div></div>
-        <div class="editor-footer"><button type="button" class="secondary" @click="requestClose">Batal</button><button class="primary" type="submit" :disabled="!ready || duplicate || categoryCreating">Simpan Anggaran</button></div>
+        <div class="editor-footer"><button type="button" class="secondary" @click="requestClose">Batal</button><button class="primary" type="submit" :disabled="saving || !ready || duplicate || categoryCreating || !!accountError" :aria-describedby="accountError ? 'budget-account-error' : undefined">Simpan Anggaran</button></div>
       </form>
     </dialog>
     <ReceiptViewer ref="receiptViewer" />
@@ -198,6 +218,10 @@ button, input, select { font: inherit; }
 button { cursor: pointer; }
 button:disabled { opacity: .5; cursor: not-allowed; }
 button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--teal); outline-offset: 3px; }
+.budget-warning { display: flex; align-items: flex-start; gap: .75rem; padding: var(--card-padding, 1rem); margin-bottom: var(--space-section, 1.5rem); border: 1px solid color-mix(in srgb, var(--warning) 55%, var(--line)); border-left: 4px solid var(--warning); border-radius: .75rem; background: color-mix(in srgb, var(--warning) 12%, var(--surface)); color: var(--ink); font-size: .85rem; line-height: 1.6; }
+.budget-warning > .material-symbols-outlined { flex: none; color: var(--warning); font-size: 1.4rem; }
+.budget-warning strong { display: block; font-weight: 800; }
+.budget-warning p { margin: .25rem 0 0; }
 .page-heading { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; margin-bottom: 1.8rem; }
 .page-heading h2 { margin: .35rem 0 .65rem; font-size: clamp(1.8rem, 4vw, 2.4rem); letter-spacing: -.04em; }
 .page-heading p { color: var(--muted); font-size: .88rem; line-height: 1.6; }
@@ -210,8 +234,6 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 .period-row label { display: flex; align-items: center; gap: .8rem; color: var(--muted); font-size: .8rem; }
 input, select { width: 100%; box-sizing: border-box; min-height: 2.8rem; padding: .65rem .8rem; border: 1px solid var(--line); border-radius: .6rem; background: var(--surface); color: var(--ink); }
 .period-row input { width: auto; max-width: 14rem; }
-.local-label { display: flex; align-items: center; gap: .4rem; color: var(--muted); font-size: .7rem; }
-.local-label .material-symbols-outlined { font-size: 1rem; }
 .metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
 .metrics > div { min-width: 0; }
 .summary-metrics { margin-bottom: 2rem; }

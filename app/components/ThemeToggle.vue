@@ -1,14 +1,17 @@
 <script setup lang="ts">
 const { theme, toggleTheme } = useTheme()
+const error = ref('')
+async function toggle() { try { await toggleTheme(); error.value = '' } catch { error.value = 'Tema belum tersimpan. Periksa penyimpanan browser.' } }
 
 const label = computed(() => theme.value === 'dark' ? 'Gunakan mode terang' : 'Gunakan mode gelap')
 const icon = computed(() => theme.value === 'dark' ? 'light_mode' : 'dark_mode')
 </script>
 
 <template>
-  <button class="theme-toggle" :aria-label="label" :title="label" type="button" @click="toggleTheme">
+  <button class="theme-toggle" :aria-label="label" :title="label" type="button" @click="toggle">
     <span class="theme-toggle__orb"><span class="material-symbols-outlined">{{ icon }}</span></span>
   </button>
+  <span v-if="error" role="alert">{{ error }}</span>
 </template>
 
 <style scoped>

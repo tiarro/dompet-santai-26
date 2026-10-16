@@ -1,5 +1,13 @@
+<script setup lang="ts">
+import '~/assets/css/light-theme.css'
+import '~/assets/css/layout-spacing.css'
+const { theme } = useTheme()
+useHead(() => ({ htmlAttrs: { class: theme.value === 'dark' ? 'theme-dark' : '', style: `color-scheme: ${theme.value}` } }))
+</script>
+
 <template>
   <main class="app-shell">
+    <OnlineStatusBanner />
     <slot />
   </main>
 </template>
@@ -14,3 +22,4 @@ button, input, textarea, select { font: inherit; }
 .app-shell { min-height: 100vh; font-family: Manrope, Inter, ui-sans-serif, system-ui, sans-serif; }
 .material-symbols-outlined { font-family: 'Material Symbols Outlined', sans-serif; font-weight: normal; font-style: normal; line-height: 1; white-space: nowrap; letter-spacing: normal; text-transform: none; direction: ltr; -webkit-font-feature-settings: 'liga'; -webkit-font-smoothing: antialiased; font-feature-settings: 'liga'; }
 </style>
+

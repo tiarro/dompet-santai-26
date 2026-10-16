@@ -6,6 +6,7 @@ const expanded = ref(false)
 const label = ref('')
 const icon = ref('category')
 const error = ref('')
+const saving = ref(false)
 const nameInput = ref<HTMLInputElement | null>(null)
 const trigger = ref<HTMLButtonElement | null>(null)
 const nameId = useId()
@@ -16,18 +17,19 @@ watch(expanded, value => emit('editing', value), { flush: 'sync' })
 function reset() { expanded.value = false; label.value = ''; icon.value = 'category'; error.value = '' }
 function open() { reset(); expanded.value = true; nextTick(() => nameInput.value?.focus()) }
 function cancel() { reset(); nextTick(() => trigger.value?.focus()) }
-function submit() {
-  if (!props.ready) return
+async function submit() {
+  if (!props.ready || saving.value) return
+  saving.value = true
   error.value = ''
   try {
-    const category = props.save({ type: props.type, label: label.value, icon: icon.value })
+    const category = await props.save({ type: props.type, label: label.value, icon: icon.value })
     reset()
     emit('created', category)
     nextTick(() => trigger.value?.focus())
   } catch (reason) {
     error.value = reason instanceof Error ? reason.message : 'Kategori belum tersimpan. Coba lagi.'
     nameInput.value?.focus()
-  }
+  } finally { saving.value = false }
 }
 watch([label, icon], () => { error.value = '' }, { flush: 'sync' })
 watch(() => props.type, reset)
@@ -36,13 +38,13 @@ defineExpose({ reset })
 
 <template>
   <section class="category-creator">
-    <button v-if="!expanded" ref="trigger" type="button" class="category-add" :disabled="!ready" @click="open"><span class="material-symbols-outlined" aria-hidden="true">add_circle</span>Tambah Kategori</button>
+    <button v-if="!expanded" ref="trigger" type="button" class="category-add" :disabled="!ready || saving" @click="open"><span class="material-symbols-outlined" aria-hidden="true">add_circle</span>Tambah Kategori</button>
     <div v-else class="category-fields">
       <h3>Kategori {{ type === 'expense' ? 'pengeluaran' : 'pemasukan' }} baru</h3>
       <div class="category-field"><label :for="nameId">Nama kategori</label><input :id="nameId" ref="nameInput" v-model="label" type="text" maxlength="32" autocomplete="off" placeholder="Contoh: Pendidikan" :aria-invalid="!!error" :aria-describedby="error ? nameId + '-error' : undefined" @keydown.enter.prevent.stop="submit"></div>
       <div class="category-field"><label :for="iconId">Ikon kategori</label><div class="icon-select"><span class="material-symbols-outlined" aria-hidden="true">{{ icon }}</span><select :id="iconId" v-model="icon"><option v-for="item in categoryIcons" :key="item.id" :value="item.id">{{ item.label }}</option></select></div></div>
       <p v-if="error" :id="nameId + '-error'" class="category-error" role="alert">{{ error }}</p>
-      <div class="category-actions"><button type="button" class="category-cancel" @click="cancel">Batal kategori</button><button type="button" class="category-save" :disabled="!ready" @click="submit">Simpan Kategori</button></div>
+      <div class="category-actions"><button type="button" class="category-cancel" @click="cancel">Batal kategori</button><button type="button" class="category-save" :disabled="!ready || saving" @click="submit">Simpan Kategori</button></div>
     </div>
   </section>
 </template>

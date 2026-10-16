@@ -1,28 +1,60 @@
+import { useCloudFinance } from './useCloudFinance'
+import { defaultTheme } from '~/utils/settings'
+
 export type Theme = 'light' | 'dark'
 
-const storageKey = 'dompet-santai-theme'
-
 export function useTheme() {
-  const theme = useState<Theme>('dashboard-theme', () => 'light')
+  const user = useSupabaseUser()
+  const cloud = useCloudFinance()
+  const theme = useState<Theme>('dashboard-theme', () => defaultTheme)
+  const preference = ref<'light' | 'dark' | 'system'>(defaultTheme)
+  let media: MediaQueryList | undefined
 
-  const applyTheme = (nextTheme: Theme) => {
-    document.documentElement.classList.toggle('theme-dark', nextTheme === 'dark')
-    document.documentElement.style.colorScheme = nextTheme
+  function apply() {
+    theme.value = preference.value === 'system' ? (media?.matches ? 'dark' : 'light') : preference.value
+    document.documentElement.classList.toggle('theme-dark', theme.value === 'dark')
+    document.documentElement.style.colorScheme = theme.value
   }
 
-  const toggleTheme = () => {
-    theme.value = theme.value === 'dark' ? 'light' : 'dark'
-    applyTheme(theme.value)
-    localStorage.setItem(storageKey, theme.value)
+  function refresh() {
+    try {
+      const raw = user.value?.sub ? cloud.data.value.settings : null
+      preference.value = raw?.theme ?? (localStorage.getItem('dompet-santai-theme') as typeof preference.value) ?? defaultTheme
+      if (!['light', 'dark', 'system'].includes(preference.value)) preference.value = defaultTheme
+      apply()
+    } catch {
+      // Keep the current theme if browser storage or cloud state is unavailable.
+      apply()
+    }
   }
+
+  async function setPreference(value: typeof preference.value) {
+    const owner = user.value?.sub
+    if (owner) {
+      if (!cloud.ready.value) throw new Error(cloud.error.value || 'Pengaturan belum siap.')
+      await cloud.save({
+        ...cloud.data.value,
+        settings: { ...cloud.data.value.settings, theme: value, revision: cloud.data.value.settings.revision + 1 },
+      })
+    } else {
+      localStorage.setItem('dompet-santai-theme', value)
+    }
+    preference.value = value
+    apply()
+  }
+
+  const toggleTheme = () => setPreference(theme.value === 'dark' ? 'light' : 'dark')
 
   onMounted(() => {
-    const savedTheme = localStorage.getItem(storageKey) as Theme | null
-    const preferredTheme: Theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-
-    theme.value = savedTheme === 'dark' || savedTheme === 'light' ? savedTheme : preferredTheme
-    applyTheme(theme.value)
+    media = window.matchMedia('(prefers-color-scheme: dark)')
+    media.addEventListener('change', apply)
+    const stop = watch([() => user.value?.sub, () => cloud.data.value.settings.theme], refresh, { immediate: true })
+    onBeforeUnmount(() => {
+      stop()
+      media?.removeEventListener('change', apply)
+    })
   })
 
-  return { theme, toggleTheme }
+  return { theme, preference, setPreference, toggleTheme }
 }
+

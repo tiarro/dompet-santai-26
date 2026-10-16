@@ -1,19 +1,20 @@
 <script setup lang="ts">
 import CategoryCreator from './CategoryCreator.vue'
 import type { CategoryCatalog, SaveCategory } from '~/utils/categories'
-import { categoryExpenses, expenseBudgetError, type MonthlyBudget } from '~/utils/budgets'
+import { categoryExpenses, expenseBudgetError, requiredExpenseAccount, type MonthlyBudget } from '~/utils/budgets'
 import ReceiptCamera from '~/components/ReceiptCamera.vue'
 import ReceiptViewer from '~/components/ReceiptViewer.vue'
 import { prepareReceipt, receiptAccept, type ReceiptAttachment } from '~/utils/receipts'
 import { formatRupiah } from '~/utils/currency'
-import { getAccountBalances, isNoteDraft, localDate, maxNoteAmount, reviseNote, noteAccounts, validNoteDate, type MoneyNote, type NoteDraft, type NoteType } from '~/utils/notes'
+import type { SavedNote } from '~/utils/pendingNotes'
+import { getSpendableBalances, isNoteDraft, localDate, maxNoteAmount, reviseNote, noteAccounts, validNoteDate, type WalletTransfer, type MoneyNote, type NoteDraft, type NoteType } from '~/utils/notes'
 
 const props = defineProps<{
   catalog: CategoryCatalog
   saveCategory: SaveCategory
   categoriesReady: boolean
-  save: (draft: NoteDraft) => MoneyNote
-  update?: (original: MoneyNote, draft: NoteDraft) => MoneyNote
+  save: (draft: NoteDraft) => MoneyNote | Promise<MoneyNote>
+  update?: (original: MoneyNote, draft: NoteDraft) => MoneyNote | Promise<MoneyNote>
   ready: boolean
   accounts: Array<{ id: string; label: string; icon: string; balance: number }>
   defaultAccount?: string
@@ -21,8 +22,14 @@ const props = defineProps<{
   budgetsReady: boolean
   budgetError?: string
   notes?: MoneyNote[]
+  transfers?: WalletTransfer[]
+  openings?: Record<string, number>
+  activeAccounts?: string[]
+  pendingMode?: boolean
 }>()
-const emit = defineEmits<{ saved: [note: MoneyNote]; updated: [note: MoneyNote] }>()
+const emit = defineEmits<{ saved: [note: SavedNote]; updated: [note: MoneyNote] }>()
+const { online } = useCloudFinance()
+const queueOnly = computed(() => props.pendingMode || (!online.value && !editing.value))
 const dialog = ref<HTMLDialogElement | null>(null)
 const amountInput = ref<HTMLInputElement | null>(null)
 const categoryInputs = ref<HTMLInputElement[]>([])
@@ -87,30 +94,42 @@ const saving = ref(false)
 const saveError = ref('')
 const confirmDiscard = ref(false)
 const today = ref(localDate())
-const categories = computed(() => props.catalog[type.value])
+const categories = computed(() => props.catalog[type.value].filter(item => !item.archived || (editing.value?.type === type.value && editing.value.category === item.id)))
 const amount = computed(() => /^\d[\d.]*$/.test(amountText.value) ? Number(amountText.value.replaceAll('.', '')) : NaN)
 const formAccounts = computed(() => {
+  if (!editing.value && type.value === 'expense' && category.value === 'other') {
+    const balances = getSpendableBalances(props.notes ?? [], today.value, props.transfers ?? [], props.openings)
+    return noteAccounts.filter(item => ['cash', 'bank', 'ewallet'].includes(item.id) && (!props.activeAccounts || props.activeAccounts.includes(item.id)))
+      .map(item => ({ ...item, balance: balances[item.id] ?? 0 }))
+  }
   if (!editing.value || props.accounts.some(item => item.id === editing.value?.account)) return props.accounts
   const originalAccount = noteAccounts.find(item => item.id === editing.value?.account)
-  return originalAccount ? [...props.accounts, { ...originalAccount, balance: getAccountBalances(props.notes ?? [], today.value)[originalAccount.id] ?? 0 }] : props.accounts
+  return originalAccount ? [...props.accounts, { ...originalAccount, balance: getSpendableBalances(props.notes ?? [], today.value, props.transfers ?? [], props.openings)[originalAccount.id] ?? 0 }] : props.accounts
 })
-const fallbackAccount = computed(() => props.accounts.some(item => item.id === props.defaultAccount)
-  ? props.defaultAccount! : (props.accounts[0]?.id ?? ''))
+const fallbackAccount = computed(() => formAccounts.value.some(item => item.id === props.defaultAccount)
+  ? props.defaultAccount! : (formAccounts.value[0]?.id ?? ''))
 const budgetAccount = computed(() => !editing.value && type.value === 'expense' && validNoteDate(date.value)
   ? props.budgets?.find(item => item.category === category.value && item.month === date.value.slice(0, 7))?.defaultAccount
   : undefined)
-const availableBudgetAccount = computed(() => props.accounts.find(item => item.id === budgetAccount.value))
-const suggestedAccount = computed(() => availableBudgetAccount.value?.id ?? fallbackAccount.value)
-watch(suggestedAccount, value => {
-  if (dialog.value?.open && !editing.value && !accountManuallySelected.value) account.value = value
+const lockedAccount = computed(() => !editing.value ? requiredExpenseAccount(
+  { type: type.value, category: category.value, date: date.value }, props.budgets ?? [],
+) : undefined)
+const availableBudgetAccount = computed(() => formAccounts.value.find(item => item.id === budgetAccount.value))
+const suggestedAccount = computed(() => lockedAccount.value ?? availableBudgetAccount.value?.id ?? fallbackAccount.value)
+watch([suggestedAccount, lockedAccount], ([value, locked]) => {
+  if (!dialog.value?.open || editing.value) return
+  if (locked || !accountManuallySelected.value) account.value = value
+  if (locked) accountManuallySelected.value = false
 })
 const selectedAccount = computed(() => formAccounts.value.find(item => item.id === account.value))
 const validAmount = computed(() => Number.isSafeInteger(amount.value) && amount.value > 0 && amount.value <= maxNoteAmount)
-const insufficientFunds = computed(() => props.ready && !editing.value && type.value === 'expense' && validAmount.value
+const insufficientFunds = computed(() => !queueOnly.value && props.ready && !editing.value && type.value === 'expense' && validAmount.value
   && !!selectedAccount.value && amount.value > selectedAccount.value.balance)
 const requiredBudgetError = computed(() => {
+  if (queueOnly.value) return ''
   if (type.value !== 'expense') return ''
   if (!props.budgetsReady) return props.budgetError || 'Menyiapkan anggaran sebelum pengeluaran dapat disimpan.'
+  if (lockedAccount.value && !availableBudgetAccount.value) return 'Dompet dari anggaran belum tersedia. Ubah dompet pada anggaran terlebih dahulu.'
   return expenseBudgetError({ type: type.value, category: category.value, date: date.value }, props.budgets ?? [])
 })
 const budgetOverage = computed(() => {
@@ -134,8 +153,9 @@ function currentDraft(): NoteDraft {
 }
 const draftSnapshot = () => JSON.stringify([type.value, amountText.value, category.value, account.value, date.value, description.value, receipt.value?.name, receipt.value?.dataUrl])
 const revisionError = computed(() => {
+  if (queueOnly.value) return ''
   if (!editing.value || !props.ready || !isNoteDraft(currentDraft(), props.catalog) || date.value > today.value) return ''
-  try { reviseNote(props.notes ?? [], editing.value, currentDraft(), today.value, props.catalog); return '' }
+  try { reviseNote(props.notes ?? [], editing.value, currentDraft(), today.value, props.catalog, props.transfers ?? [], props.openings); return '' }
   catch (error) { return error instanceof Error ? error.message : 'Perubahan belum dapat disimpan.' }
 })
 const dirty = computed(() => editing.value
@@ -226,7 +246,7 @@ function requestClose() {
   else close()
 }
 
-function submit() {
+async function submit() {
   if (saving.value || receiptBusy.value || categoryCreating.value || !props.ready || revisionError.value || requiredBudgetError.value) return
   attempted.value = true
   saveError.value = ''
@@ -243,7 +263,7 @@ function submit() {
   try {
     const wasEditing = !!editing.value
     if (editing.value && !props.update) throw new Error('Perubahan catatan belum tersedia.')
-    const note = editing.value ? props.update!(editing.value, currentDraft()) : props.save(currentDraft())
+    const note = editing.value ? await props.update!(editing.value, currentDraft()) : await props.save(currentDraft())
     close()
     if (wasEditing) emit('updated', note)
     else emit('saved', note)
@@ -255,7 +275,7 @@ function submit() {
 }
 
 function backdropClick(event: MouseEvent) {
-  if (event.target !== dialog.value) return
+  if (event.target !== dialog.value || !dialog.value) return
   const bounds = dialog.value.getBoundingClientRect()
   if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) requestClose()
 }
@@ -286,12 +306,11 @@ defineExpose({ open, edit, close })
       <div class="note-heading">
         <span class="heading-icon material-symbols-outlined" aria-hidden="true">edit_note</span>
         <div>
-          <h2 id="note-dialog-title">{{ editing ? 'Ubah Catatan' : 'Tambah Catatan' }}</h2>
+          <h2 id="note-dialog-title">{{ pendingMode ? 'Perbaiki Catatan Tertunda' : editing ? 'Ubah Catatan' : 'Tambah Catatan' }}</h2>
           <p id="note-dialog-description">Catat sebentar, tenang seharian.</p>
         </div>
       </div>
       <div class="note-actions">
-        <ThemeToggle />
         <button type="button" class="close-note" :aria-label="editing ? 'Tutup ubah catatan' : 'Tutup tambah catatan'" @click="requestClose">
           <span class="material-symbols-outlined" aria-hidden="true">close</span>
         </button>
@@ -300,6 +319,7 @@ defineExpose({ open, edit, close })
 
     <form class="note-form" novalidate :aria-busy="saving" @submit.prevent="submit">
       <div class="note-fields">
+        <p v-if="queueOnly" class="queue-notice" role="status">Catatan disimpan di perangkat dengan status Menunggu sinkronisasi. Saldo dan anggaran akan diperiksa saat internet tersedia; saldo resmi belum berubah.</p>
         <fieldset class="type-picker">
           <legend class="visually-hidden">Jenis catatan</legend>
           <label v-for="option in [{ id: 'expense', label: 'Pengeluaran', icon: 'north_east' }, { id: 'income', label: 'Pemasukan', icon: 'south_west' }]" :key="option.id" :class="{ selected: type === option.id }">
@@ -339,15 +359,17 @@ defineExpose({ open, edit, close })
             <label for="note-account">{{ type === 'expense' ? 'Bayar dari' : 'Masuk ke' }}</label>
             <div class="detail-control">
               <span class="material-symbols-outlined" aria-hidden="true">account_balance_wallet</span>
-              <select id="note-account" v-model="account" @change="accountManuallySelected = true" :aria-describedby="(insufficientFunds ? 'note-funds-error' : 'note-balance-help') + (budgetAccount ? ' note-budget-account-help' : '')">
+              <select id="note-account" v-model="account" :disabled="!!lockedAccount" @change="accountManuallySelected = true" :aria-describedby="(insufficientFunds ? 'note-funds-error' : 'note-balance-help') + (budgetAccount ? ' note-budget-account-help' : '')">
+                <option v-if="lockedAccount && !availableBudgetAccount" :value="lockedAccount" disabled>{{ noteAccounts.find(item => item.id === lockedAccount)?.label }} (tidak tersedia)</option>
                 <option v-for="item in formAccounts" :key="item.id" :value="item.id">{{ item.label }} &middot; {{ ready ? formatRupiah(item.balance) : 'Saldo belum tersedia' }}</option>
               </select>
             </div>
             <p v-if="budgetAccount" id="note-budget-account-help" class="balance-help">
-              <template v-if="availableBudgetAccount">Pilihan anggaran: {{ availableBudgetAccount.label }}. Kamu bisa memakai dompet lain untuk catatan ini.</template>
-              <template v-else>Dompet {{ noteAccounts.find(item => item.id === budgetAccount)?.label }} dari anggaran belum tersedia. Pilih dompet yang akan digunakan.</template>
+              <template v-if="lockedAccount && availableBudgetAccount">Mengikuti anggaran: {{ availableBudgetAccount.label }}. Untuk mengganti dompet, ubah pengaturan anggaran kategori ini.</template>
+              <template v-else-if="lockedAccount">Dompet {{ noteAccounts.find(item => item.id === budgetAccount)?.label }} dari anggaran belum tersedia. Ubah dompet pada anggaran terlebih dahulu.</template>
+              <template v-else>Kategori Lainnya: pilih Tunai, Bank, atau E-Wallet untuk pengeluaran ini.</template>
             </p>
-            <p id="note-balance-help" class="balance-help">Saldo contoh, diperbarui dari catatanmu di browser ini.</p>
+            <p id="note-balance-help" class="balance-help">Saldo dihitung dari saldo awal, catatan, dan tabungan.</p>
             <p v-if="ready && validAmount && selectedAccount && !insufficientFunds && !revisionError" class="balance-preview" aria-live="polite">
               {{ editing ? 'Saldo setelah perubahan' : type === 'expense' ? 'Sisa setelah pengeluaran' : 'Saldo setelah pemasukan' }}
               <strong>{{ formatRupiah(remainingBalance) }}</strong>
@@ -378,14 +400,15 @@ defineExpose({ open, edit, close })
           <p v-if="receiptBusy" class="field-help" role="status">Menyiapkan foto struk...</p>
           <div v-if="receipt" ref="receiptPreview" class="receipt-preview">
             <button class="receipt-preview__image" type="button" aria-label="Lihat foto struk lebih besar" @click="receiptViewer?.open(receipt)">
-              <img :src="receipt.dataUrl" alt="Pratinjau foto struk">
+              <p v-if="!receipt.dataUrl">Foto belum bisa dimuat. Struk tetap tersimpan.</p>
+              <img v-else :src="receipt.dataUrl" alt="Pratinjau foto struk">
               <span><span class="material-symbols-outlined" aria-hidden="true">zoom_in</span>Lihat foto</span>
             </button>
             <div class="receipt-preview__caption"><span>{{ receipt.name }}</span><button type="button" @click="removeReceipt">Hapus foto</button></div>
           </div>
           <p v-if="receiptError" class="field-error" role="alert">{{ receiptError }}</p>
         </section>
-        <p class="storage-note"><span class="material-symbols-outlined" aria-hidden="true">info</span>Catatan tersimpan di browser ini untuk akunmu. Belum tersinkron ke perangkat lain.</p>
+        <p class="storage-note"><span class="material-symbols-outlined" aria-hidden="true">info</span>Catatan tersimpan secara lokal dan belum tersinkron ke perangkat lain.</p>
         <p v-if="saveError" class="field-error save-error" role="alert">{{ saveError }}</p>
       </div>
 
@@ -400,13 +423,13 @@ defineExpose({ open, edit, close })
         <template v-else>
           <p v-if="insufficientFunds" id="note-funds-error" class="insufficient-funds" role="alert">
             <span class="material-symbols-outlined" aria-hidden="true">account_balance_wallet</span>
-            <span>Saldo {{ selectedAccount?.label }} tidak cukup. Kurang <strong>{{ formatRupiah(amount - (selectedAccount?.balance ?? 0)) }}</strong>. Kurangi nominal atau pilih sumber uang lain.</span>
+            <span>Saldo {{ selectedAccount?.label }} tidak cukup. Kurang <strong>{{ formatRupiah(amount - (selectedAccount?.balance ?? 0)) }}</strong>. {{ lockedAccount ? 'Kurangi nominal atau ubah dompet pada anggaran.' : 'Kurangi nominal atau pilih sumber uang lain.' }}</span>
           </p>
           <p v-if="revisionError" id="note-revision-error" class="field-error" role="alert">{{ revisionError }}</p>
           <p v-if="requiredBudgetError" id="note-budget-error" class="field-error" role="alert">{{ requiredBudgetError }}</p>
           <button type="submit" class="save-note" :disabled="saving || receiptBusy || categoryCreating || !ready || insufficientFunds || !!revisionError || !!requiredBudgetError" :aria-describedby="requiredBudgetError ? 'note-budget-error' : revisionError ? 'note-revision-error' : insufficientFunds ? 'note-funds-error' : undefined">
             <span class="material-symbols-outlined" aria-hidden="true">check</span>
-            {{ saving ? 'Menyimpan...' : editing ? 'Simpan Perubahan' : 'Simpan Catatan' }}
+            {{ saving ? 'Menyimpan...' : queueOnly ? 'Simpan ke Antrean' : editing ? 'Simpan Perubahan' : 'Simpan Catatan' }}
           </button>
           <p>Satu catatan kecil, selangkah lebih teratur.</p>
         </template>
@@ -418,6 +441,7 @@ defineExpose({ open, edit, close })
 </template>
 
 <style scoped>
+.queue-notice { padding: .85rem; border: 1px solid var(--line); border-radius: .75rem; color: var(--ink); background: color-mix(in srgb, var(--teal) 9%, var(--surface)); font-size: .8rem; line-height: 1.6; }
 .budget-warning { padding: .8rem; border: 1px solid color-mix(in srgb, var(--warning) 35%, var(--line)); border-radius: .65rem; background: color-mix(in srgb, var(--warning) 8%, var(--surface)); color: var(--warning); font-size: .8rem; line-height: 1.6; }
 .note-dialog {
   --note-accent: var(--teal);

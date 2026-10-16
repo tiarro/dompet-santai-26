@@ -1,13 +1,26 @@
 <script setup lang="ts">
+import ProfileDialog from '~/components/ProfileDialog.vue';
+import SavingsOverview from '~/components/SavingsOverview.vue';
+import SettingsOverview from '~/components/SettingsOverview.vue';
+import { notesReminderDue } from '~/utils/settings';
 import ReceiptViewer from '~/components/ReceiptViewer.vue';
 import HistoryOverview from '~/components/HistoryOverview.vue';
 import AddNoteDialog from '~/components/AddNoteDialog.vue';
-import { openingWalletTotal, noteAccounts, summarizeNotes, type MoneyNote } from '~/utils/notes';
+import CardPagination from '~/components/CardPagination.vue';
+import BillsCard from '~/components/BillsCard.vue';
+import NotificationPanel from '~/components/NotificationPanel.vue';
+import PendingNotesCard from '~/components/PendingNotesCard.vue';
+import type { SavedNote } from '~/utils/pendingNotes';
+import { buildNotifications, type FinanceNotification } from '~/utils/notifications';
+import { localDate, noteAccounts, reservedSavings, summarizeNotes, type MoneyNote } from '~/utils/notes';
 import { formatRupiah } from '~/utils/currency';
 import { summarizeBudgets } from '~/utils/budgets';
-const props = defineProps<{ section?: 'home' | 'budgets' | 'history' }>();
+import { summarizeSavings } from '~/utils/savings';
+const props = defineProps<{ section?: 'home' | 'budgets' | 'history' | 'savings' | 'settings' }>();
 const historyPage = computed(() => props.section === 'history');
 const historyOverview = ref<InstanceType<typeof HistoryOverview> | null>(null);
+const savingsPage = computed(() => props.section === 'savings');
+const settingsPage = computed(() => props.section === 'settings');
 const budgetPage = computed(() => props.section === 'budgets');
 const { catalog, ready: categoriesReady, storageError: categoriesError, save: saveCategory, readLatest: readLatestCategories } = useCategories();
 const { budgets: monthlyBudgets, ready: budgetsReady, storageError: budgetError, save: saveBudget } = useBudgets(readLatestCategories);
@@ -19,32 +32,77 @@ function navigateMenu(label: string) {
   if (label === 'Beranda') navigateTo('/');
   if (label === 'Anggaran') navigateTo('/anggaran');
   if (label === 'Riwayat') navigateTo('/riwayat');
+  if (label === 'Tabungan') navigateTo('/tabungan');
+  if (label === 'Setting' || label === 'Pengaturan') navigateTo('/pengaturan');
 }
-function menuActive(label: string) { return label === (historyPage.value ? 'Riwayat' : budgetPage.value ? 'Anggaran' : 'Beranda'); }
+function menuActive(label: string) { return (label === 'Setting' ? 'Pengaturan' : label) === (settingsPage.value ? 'Pengaturan' : savingsPage.value ? 'Tabungan' : historyPage.value ? 'Riwayat' : budgetPage.value ? 'Anggaran' : 'Beranda'); }
 
-const profileImage =
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuDCq0YkRqEi3ufBkn8VdCMU3Sf8h4i-R0MEft4hWcx5uUDDY1TK3W6b_QdwobdFUhNpOpZTlfYsXQu5qQRmqR-Qxfc1V2Yr75bcTyLCPtya2A8HG9fH6RwKVzKV4MjWidmxW7X-dslt34_BIjasrgi9UPslw0CQngqG2LyWiJ1vXyQ1FUoGrT9nxstE80yVWBol-g8uozi5iqwKHIoDaq8dh3wFZuluCaEhP5KKQOp3jk_Xpj093AyR";
+const defaultProfileImage = '/avatar-default.svg';
 
-const { notes, balances, ready, storageError, today, save, update, remove } = useMoneyNotes(readLatestCategories);
+const { notes, transfers, balances, openings, settings, ready, storageError, today, save, update, remove } = useMoneyNotes(readLatestCategories);
+const { data: savingsData, ready: savingsReady, error: savingsError } = useSavings(readLatestCategories);
+const savingsSummary = computed(() => summarizeSavings(savingsData.value, today.value));
+const homeSavings = computed(() => [...savingsSummary.value.goals].sort((a, b) => Number(a.archived) - Number(b.archived) || b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id)));
 const receiptViewer = ref<InstanceType<typeof ReceiptViewer> | null>(null);
 const noteDialog = ref<InstanceType<typeof AddNoteDialog> | null>(null);
 const user = useSupabaseUser();
-const finances = useState('onboarding-step-two', () => ({ payday: '25', balance: '', accounts: ['cash', 'bank', 'ewallet'] }));
-const accounts = computed(() => {
-  const selected = noteAccounts.filter(account => finances.value.accounts.includes(account.id));
-  const available = selected.length ? selected : noteAccounts.filter(account => account.id !== 'savings');
-  return available.map(account => ({ ...account, balance: balances.value[account.id] ?? 0 }));
+const notificationOwner = computed(() => user.value?.sub ?? '');
+const billStore = useBills();
+const notificationPanel = ref<InstanceType<typeof NotificationPanel> | null>(null);
+const { read: readNotifications, mark: markNotifications, storageWarning: notificationStorageWarning } = useNotificationRead(notificationOwner);
+const { image: profileImage, savePhoto } = useProfilePhoto(defaultProfileImage);
+const profileDialog = ref<InstanceType<typeof ProfileDialog> | null>(null);
+const totalBalance = computed(() => Object.values(balances.value).reduce((sum, value) => sum + value, 0) + reservedSavings(transfers.value, today.value));
+const navScrolled = ref(false);
+function syncNavScroll() { navScrolled.value = window.scrollY > 0; }
+onMounted(() => {
+  syncNavScroll();
+  window.addEventListener('scroll', syncNavScroll, { passive: true });
 });
+onBeforeUnmount(() => window.removeEventListener('scroll', syncNavScroll));
+const reminderClock = ref(new Date());
+let reminderTimer: ReturnType<typeof setInterval> | undefined;
+function syncReminderClock() { reminderClock.value = new Date(); today.value = localDate(reminderClock.value); }
+onMounted(() => { syncReminderClock(); reminderTimer = setInterval(syncReminderClock, 30000); window.addEventListener('focus', syncReminderClock); });
+onBeforeUnmount(() => { clearInterval(reminderTimer); window.removeEventListener('focus', syncReminderClock); });
+const showNoteReminder = computed(() => ready.value && notesReminderDue(settings.value, notes.value, reminderClock.value));
+const notifications = computed(() => buildNotifications({
+  now: reminderClock.value, bills: billStore.items.value, budgets: monthlyBudgets.value, notes: notes.value,
+  savings: savingsData.value, settings: settings.value, catalog: catalog.value,
+  financeReady: ready.value && !storageError.value, billsReady: !billStore.error.value,
+  budgetsReady: budgetsReady.value && categoriesReady.value && !budgetError.value && !categoriesError.value,
+  savingsReady: savingsReady.value && !savingsError.value,
+}));
+const unreadNotifications = computed(() => notifications.value.filter(item => !readNotifications.value.includes(item.readKey)).length);
+const notificationLoading = computed(() => billStore.loading.value || (!ready.value && !storageError.value));
+const notificationWarning = computed(() => [
+  billStore.error.value ? 'Pengingat tagihan belum bisa dimuat.' : '',
+  storageError.value || budgetError.value || savingsError.value || categoriesError.value ? 'Sebagian pengingat keuangan belum bisa dimuat.' : '',
+].filter(Boolean).join(' '));
+const { refresh: refreshFinance } = useSettings();
+function refreshNotifications() { void billStore.refresh(); void refreshFinance(); }
+function openNotifications() { syncReminderClock(); notificationPanel.value?.open(); void billStore.refresh(); }
+async function selectNotification(item: FinanceNotification) {
+  markNotifications([item]);
+  if (item.kind === 'note') { noteDialog.value?.open(); return; }
+  if (item.kind === 'bill') await navigateTo({ path: '/', query: { bill: item.target } });
+  if (item.kind === 'budget') await navigateTo({ path: '/anggaran', query: { category: item.target } });
+  if (item.kind === 'savings') await navigateTo({ path: '/tabungan', query: { goal: item.target } });
+}
+const accounts = computed(() => {
+  return noteAccounts.filter(account => settings.value.activeAccounts.includes(account.id))
+    .map(account => ({ ...account, balance: balances.value[account.id] ?? 0 }));
+});
+const spendableBalance = computed(() => accounts.value.filter(account => account.id !== 'savings').reduce((sum, account) => sum + account.balance, 0));
+const balancesReady = computed(() => ready.value && !storageError.value);
 const latestAccount = computed(() => notes.value.at(-1)?.account);
 const totals = computed(() => summarizeNotes(notes.value, today.value));
 const summaryCards = computed(() => [
-  { label: "Saldo Nyata", value: formatRupiah(openingWalletTotal + totals.value.net), icon: "account_balance_wallet", tone: "neutral" },
-  { label: "Uang Aman Dipakai", value: formatRupiah(openingWalletTotal - 6_300_000 + totals.value.net), helper: "Simulasi setelah dana yang disisihkan", icon: "verified_user", tone: "primary" },
-  { label: "Pengeluaran Hari Ini", value: formatRupiah(125_000 + totals.value.todayExpenses), helper: "Batas harian: Rp200.000", icon: "receipt_long", tone: "neutral", danger: true },
+  { label: "Saldo Nyata", value: balancesReady.value ? formatRupiah(totalBalance.value) : "—", icon: "account_balance_wallet", tone: "neutral" },
+  { label: "Uang Aman Dipakai", value: balancesReady.value ? formatRupiah(spendableBalance.value) : "—", helper: "Saldo dompet aktif di luar tabungan; belum termasuk tagihan", icon: "verified_user", tone: "primary" },
+  { label: "Pengeluaran Hari Ini", value: balancesReady.value ? formatRupiah(totals.value.todayExpenses) : "—", helper: "Total catatan pengeluaran hari ini", icon: "receipt_long", tone: "neutral", danger: true },
 ]);
 
-// Existing example balances remain visible while this first version uses a local ledger.
-// Safe-to-spend = example balance + net notes - fixed example reserve (Rp6.300.000).
 const budgets = computed(() => summarizeBudgets(monthlyBudgets.value, notes.value, today.value.slice(0, 7), today.value, catalog.value).allocated.map(item => ({
   ...item,
   status: item.status === 'reached' || item.status === 'exceeded' ? 'low' : item.status,
@@ -52,13 +110,13 @@ const budgets = computed(() => summarizeBudgets(monthlyBudgets.value, notes.valu
 })));
 
 const recentNotes = computed(() => [...notes.value]
-  .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt)).slice(0, 5));
+  .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id)));
 const toast = ref('');
 const undoId = ref<string | null>(null);
 const undoError = ref('');
-function saved(note: MoneyNote) {
-  toast.value = 'Catatan tersimpan';
-  undoId.value = note.id;
+function saved(note: SavedNote) {
+  toast.value = note.pendingSync ? 'Catatan tersimpan di perangkat — Menunggu sinkronisasi' : 'Catatan tersimpan';
+  undoId.value = note.pendingSync ? null : note.id;
   undoError.value = '';
 }
 function updated(note: MoneyNote) {
@@ -72,11 +130,11 @@ function deleted() {
   undoId.value = null;
   undoError.value = '';
 }
-function removeHistory(note: MoneyNote) { remove(note.id, note); }
-function undo() {
+async function removeHistory(note: MoneyNote) { await remove(note.id, note); }
+async function undo() {
   if (!undoId.value) return;
   try {
-    remove(undoId.value);
+    await remove(undoId.value);
     undoId.value = null;
     toast.value = 'Catatan diurungkan';
     undoError.value = '';
@@ -104,15 +162,6 @@ onBeforeUnmount(() => {
 });
 
 
-const bills = [
-  {
-    label: "Internet Rumah",
-    due: "Besok, 15 Okt",
-    value: "Rp350.000",
-    icon: "wifi",
-  },
-  { label: "Listrik PLN", due: "20 Okt", value: "Rp200.000", icon: "bolt" },
-];
 
 const navigation = [
   { label: "Beranda", icon: "home", active: true },
@@ -134,27 +183,27 @@ const desktopNavigation = [
 <template>
   <div class="dashboard-page">
     <h1 data-testid="page-title" class="sr-only">Dompet Santai</h1>
-    <header class="topbar">
+    <header class="topbar" :class="{ 'topbar--scrolled': navScrolled }">
       <div class="user-greeting">
-        <img class="avatar" :src="profileImage" alt="Profil pengguna" />
-        <span>Halo, User</span>
+        <button class="profile-trigger" type="button" aria-label="Edit profil" aria-haspopup="dialog" @click="profileDialog?.open()"><img class="avatar" :src="profileImage" alt="Foto profil" /></button>
       </div>
       <div class="topbar__actions">
         <ThemeToggle /><button
-          class="icon-button"
-          aria-label="Lihat notifikasi"
+          class="icon-button notification-trigger"
+          aria-label="Lihat notifikasi" aria-haspopup="dialog" @click="openNotifications"
           type="button"
         >
-          <span class="material-symbols-outlined">notifications</span>
+          <span class="material-symbols-outlined" aria-hidden="true">notifications</span>
+          <span v-if="unreadNotifications" class="notification-badge" :aria-label="`${unreadNotifications} notifikasi belum dibaca`">{{ unreadNotifications > 99 ? '99+' : unreadNotifications }}</span>
         </button>
       </div>
     </header>
 
     <aside class="desktop-sidebar" aria-label="Navigasi desktop">
       <div class="desktop-sidebar__brand">
-        <img :src="profileImage" alt="Profil Dompet Santai" />
+        <button class="profile-trigger" type="button" aria-label="Edit profil" aria-haspopup="dialog" @click="profileDialog?.open()"><img :src="profileImage" alt="Foto profil" /></button>
         <div>
-          <strong>Dompet Santai</strong><span>Halo, Sahabat Keuangan</span>
+          <strong>Dompet Santai</strong>
         </div>
       </div>
       <nav class="desktop-sidebar__nav">
@@ -174,13 +223,14 @@ const desktopNavigation = [
 
     <header class="desktop-header">
       <div>
-        <h2>Halo, User</h2>
+        <h2>Halo, selamat datang!</h2>
         <p>Selamat pagi, kamu masih aman hari ini.</p>
       </div>
       <div class="desktop-header__actions">
         <ThemeToggle />
-        <button class="icon-button" aria-label="Lihat notifikasi" type="button">
-          <span class="material-symbols-outlined">notifications</span>
+        <button class="icon-button notification-trigger" aria-label="Lihat notifikasi" aria-haspopup="dialog" @click="openNotifications" type="button">
+          <span class="material-symbols-outlined" aria-hidden="true">notifications</span>
+          <span v-if="unreadNotifications" class="notification-badge" :aria-label="`${unreadNotifications} notifikasi belum dibaca`">{{ unreadNotifications > 99 ? '99+' : unreadNotifications }}</span>
         </button>
         <button class="desktop-add-note" type="button" aria-label="Tambah Catatan" @click="noteDialog?.open()">
           <span class="material-symbols-outlined">add</span
@@ -189,13 +239,15 @@ const desktopNavigation = [
       </div>
     </header>
 
-    <main v-if="!budgetPage && !historyPage" class="dashboard-content">
+    <PendingNotesCard />
+    <main v-if="!budgetPage && !historyPage && !savingsPage && !settingsPage" class="dashboard-content home-content">
+      <aside v-if="showNoteReminder" class="preview-notice" role="status">Belum ada catatan hari ini. Luangkan sebentar untuk mencatat keuanganmu. <button class="view-receipt" @click="noteDialog?.open()">Catat sekarang</button></aside>
       <section class="intro" aria-labelledby="intro-title">
         <h2 id="intro-title">Selamat pagi, kamu masih aman hari ini.</h2>
         <p>Catat pengeluaran dan pemasukanmu, satu per satu.</p>
       </section>
 
-      <p class="preview-notice"><span class="material-symbols-outlined" aria-hidden="true">info</span>Pratinjau: saldo dan ringkasan harian masih memakai data contoh. Anggaran mengikuti batas dan catatanmu di browser ini.</p>
+      <p class="preview-notice"><span class="material-symbols-outlined" aria-hidden="true">info</span>Saldo awal mengikuti Pengaturan → Dompet dan saldo awal. Ringkasan diperbarui sesuai catatan dan tabunganmu.</p>
       <p v-if="categoriesError || storageError" class="notes-error" role="alert">{{ categoriesError || storageError }}</p>
       <section class="summary-grid" aria-label="Ringkasan keuangan">
         <article
@@ -226,7 +278,7 @@ const desktopNavigation = [
       </section>
 
       <div class="content-grid">
-        <section class="budget-section" aria-labelledby="budget-title">
+        <section class="budget-section widget-card" aria-labelledby="budget-title">
           <div class="section-heading">
             <h2 id="budget-title">Kondisi Anggaran</h2>
             <button type="button" @click="navigateTo('/anggaran')">Lihat Semua</button>
@@ -234,10 +286,11 @@ const desktopNavigation = [
           <p v-if="budgetError" class="notes-error" role="alert">{{ budgetError }}</p>
           <p v-else-if="!budgetsReady || !ready" class="notes-count">Memuat anggaran...</p>
           <div v-else-if="!budgets.length" class="notes-empty"><p>Belum ada anggaran bulan ini.</p><NuxtLink to="/anggaran" class="view-receipt">Atur Anggaran</NuxtLink></div>
-          <div v-else class="budget-list">
+          <CardPagination v-else :items="budgets" label="Kondisi Anggaran" :reset-key="`${user?.sub}:${today.slice(0, 7)}`" v-slot="{ items }">
+          <div class="budget-list">
             <article
-              v-for="budget in budgets"
-              :key="budget.label"
+              v-for="budget in items"
+              :key="budget.id"
               class="budget-card"
               :class="`budget-card--${budget.status}`"
             >
@@ -258,29 +311,15 @@ const desktopNavigation = [
               </div>
             </article>
           </div>
+          </CardPagination>
 
         </section>
 
         <aside class="side-widgets">
-          <section class="widget-card" aria-labelledby="bills-title">
-            <h2 id="bills-title">Tagihan Mendatang</h2>
-            <ul class="bill-list">
-              <li v-for="bill in bills" :key="bill.label" class="bill-row">
-                <div class="bill-row__label">
-                  <span class="bill-icon material-symbols-outlined">{{
-                    bill.icon
-                  }}</span>
-                  <div>
-                    <h3>{{ bill.label }}</h3>
-                    <p>{{ bill.due }}</p>
-                  </div>
-                </div>
-                <strong>{{ bill.value }}</strong>
-              </li>
-            </ul>
-          </section>
+          <BillsCard :bills="billStore" :today="today" :catalog="catalog" :active-accounts="settings.activeAccounts" :ready="ready && categoriesReady" />
 
           <section
+            v-if="savingsReady && homeSavings.length && !savingsError"
             class="widget-card savings-card"
             aria-labelledby="savings-title"
           >
@@ -288,9 +327,11 @@ const desktopNavigation = [
               <h2 id="savings-title">Target Tabungan</h2>
               <span class="material-symbols-outlined">flag</span>
             </div>
+            <CardPagination :items="homeSavings" label="Target Tabungan" :reset-key="user?.sub" v-slot="{ items }">
+            <article v-for="featuredSavings in items" :key="featuredSavings.id" class="home-savings-item">
             <div
               class="savings-progress"
-              aria-label="Dana darurat sudah terkumpul 62 persen"
+              :aria-label="featuredSavings.name + ' ' + featuredSavings.progress + ' persen'"
             >
               <svg viewBox="0 0 100 100" aria-hidden="true">
                 <circle
@@ -301,27 +342,34 @@ const desktopNavigation = [
                 />
                 <circle
                   class="savings-progress__value"
+                  :style="{ strokeDashoffset: 282.6 * (1 - featuredSavings.progress / 100) }"
                   cx="50"
                   cy="50"
                   r="45"
                 />
               </svg>
-              <strong>62%</strong>
+              <strong>{{ featuredSavings.progress }}%</strong>
             </div>
             <div class="savings-card__copy">
-              <h3>Dana Darurat</h3>
-              <p>Terkumpul Rp6.200.000 dari Rp10.000.000</p>
+              <h3>{{ featuredSavings.name }}</h3>
+              <p>Terkumpul {{ formatRupiah(featuredSavings.balance) }} dari {{ formatRupiah(featuredSavings.target) }}</p>
+              <p v-if="featuredSavings.archived">Diarsipkan</p>
             </div>
+            </article>
+            </CardPagination>
+            <NuxtLink class="view-receipt" to="/tabungan">Kelola Tabungan</NuxtLink>
           </section>
+          <section v-else class="widget-card savings-card"><h2>Target Tabungan</h2><p v-if="savingsError" role="alert">{{ savingsError }}</p><p v-else-if="!savingsReady">Memuat tabungan...</p><template v-else><p>Belum ada target tabungan. Mulai sisihkan dana untuk tujuanmu.</p><NuxtLink class="view-receipt" to="/tabungan">Buat Target Tabungan</NuxtLink></template></section>
         </aside>
       </div>
       <section class="recent-notes widget-card" aria-labelledby="recent-notes-title">
         <div class="section-heading">
           <h2 id="recent-notes-title">Catatan Terbaru</h2>
-          <span class="local-badge">Di browser ini</span>
+
         </div>
-        <ul v-if="recentNotes.length" class="note-list">
-          <li v-for="note in recentNotes" :key="note.id" class="saved-note">
+        <CardPagination :items="recentNotes" label="Catatan Terbaru" :reset-key="user?.sub" v-slot="{ items }">
+        <ul v-if="items.length" class="note-list">
+          <li v-for="note in items" :key="note.id" class="saved-note">
             <span class="saved-note__icon material-symbols-outlined" aria-hidden="true">{{ categoryFor(note).icon }}</span>
             <div class="saved-note__copy">
               <strong>{{ note.description || categoryFor(note).label }}</strong>
@@ -339,10 +387,12 @@ const desktopNavigation = [
           <p>Mulai dari satu catatan kecil.</p>
           <span>Pengeluaran dan pemasukan yang kamu simpan akan muncul di sini.</span>
         </div>
-        <p v-if="notes.length > 5" class="notes-count">Menampilkan 5 catatan terbaru dari {{ notes.length }} catatan.</p>
+        </CardPagination>
         <NuxtLink to="/riwayat" class="view-receipt">Lihat semua riwayat</NuxtLink>
       </section>
     </main>
+    <main v-else-if="settingsPage" class="dashboard-content"><SettingsOverview :key="user?.sub" @edit-profile="profileDialog?.open()" /></main>
+    <main v-else-if="savingsPage" class="dashboard-content"><SavingsOverview :key="user?.sub" :get-categories="readLatestCategories" :today="today" /></main>
     <main v-else-if="budgetPage" class="dashboard-content">
       <BudgetOverview :key="user?.sub" :accounts="accounts" :budgets="monthlyBudgets" :notes="notes" :today="today" :ready="ready && budgetsReady && categoriesReady" :error="categoriesError || storageError || budgetError" :catalog="catalog" :save-category="saveCategory" :categories-ready="categoriesReady" :save="saveBudget" @expense="openBudgetExpense" />
     </main>
@@ -361,8 +411,10 @@ const desktopNavigation = [
         </template>
       </HistoryOverview>
     </main>
+    <NotificationPanel ref="notificationPanel" :items="notifications" :read="readNotifications" :owner="notificationOwner" :loading="notificationLoading" :warning="notificationWarning" :storage-warning="notificationStorageWarning" @select="selectNotification" @mark-all="markNotifications(notifications)" @settings="navigateTo('/pengaturan#pengingat')" @refresh="refreshNotifications" />
+    <ProfileDialog ref="profileDialog" :image="profileImage" :save-photo="savePhoto" />
     <ReceiptViewer ref="receiptViewer" />
-    <AddNoteDialog ref="noteDialog" :save="save" :update="update" :ready="ready && categoriesReady" :catalog="catalog" :save-category="saveCategory" :categories-ready="categoriesReady" :accounts="accounts" :default-account="latestAccount" :budgets="monthlyBudgets" :budgets-ready="budgetsReady" :budget-error="budgetError" :notes="notes" @saved="saved" @updated="updated" />
+    <AddNoteDialog ref="noteDialog" :save="save" :update="update" :ready="ready && categoriesReady" :catalog="catalog" :save-category="saveCategory" :categories-ready="categoriesReady" :accounts="accounts" :default-account="latestAccount" :budgets="monthlyBudgets" :budgets-ready="budgetsReady" :budget-error="budgetError" :notes="notes" :transfers="transfers" :openings="openings" :active-accounts="settings.activeAccounts" @saved="saved" @updated="updated" />
     <div v-if="toast && !historyPage" class="note-toast">
       <div class="note-toast__row">
         <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
@@ -394,6 +446,14 @@ const desktopNavigation = [
 </template>
 
 <style scoped>
+.notification-trigger { position: relative; }
+.notification-badge { position: absolute; top: -.2rem; right: -.25rem; display: grid; place-items: center; min-width: 1.15rem; height: 1.15rem; padding: 0 .2rem; box-sizing: border-box; border: 2px solid var(--surface); border-radius: 1rem; color: #fff; background: #c44242; font-size: .6rem; font-weight: 800; line-height: 1; }
+.home-savings-item { display: grid; grid-template-columns: 4.5rem minmax(0, 1fr); align-items: center; gap: 1rem; padding-block: 1rem; }
+.home-savings-item + .home-savings-item { border-top: 1px solid var(--line); }
+.home-savings-item .savings-progress { width: 4.5rem; height: 4.5rem; margin: 0; }
+.home-savings-item .savings-progress strong { font-size: .9rem; }
+.home-savings-item .savings-card__copy { min-width: 0; text-align: left; }
+.home-savings-item .savings-card__copy h3 { overflow-wrap: anywhere; }
 .note-toast.note-toast--inline { position: static; width: auto; max-width: none; transform: none; margin: 1rem 0; box-shadow: none; }
 .budget-card__name { min-width: 0; }
 .budget-card__name > span:last-child, .saved-note__copy p { min-width: 0; overflow-wrap: anywhere; }
@@ -401,7 +461,6 @@ const desktopNavigation = [
 .preview-notice .material-symbols-outlined { flex: none; margin-top: .1rem; color: var(--teal); font-size: 1.1rem; }
 .notes-error { color: var(--danger); font-size: .78rem; line-height: 1.5; }
 .recent-notes { margin-top: 1.5rem; }
-.local-badge { padding: .25rem .5rem; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font-size: .62rem; }
 .note-list { padding: 0; margin: .75rem 0 0; list-style: none; }
 .saved-note { display: flex; align-items: center; gap: .75rem; padding: .85rem 0; border-top: 1px solid var(--line); }
 .saved-note__icon { display: grid; flex: none; place-items: center; width: 2.5rem; height: 2.5rem; border-radius: .75rem; color: var(--teal); background: color-mix(in srgb, var(--teal) 10%, var(--surface)); font-size: 1.2rem; }
@@ -471,12 +530,25 @@ html.theme-dark .saved-note__amount--income { color: #74d9cb; }
   background: rgb(250 251 248 / 92%);
   backdrop-filter: blur(12px);
 }
+.topbar::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0;
+  height: 1px;
+  background: var(--line);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .15s ease;
+}
+.topbar--scrolled::after { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .topbar::after { transition: none; } }
 .topbar__actions {
   display: flex;
   align-items: center;
   gap: 0.15rem;
 }
 .user-greeting {
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 0.625rem;
@@ -484,7 +556,13 @@ html.theme-dark .saved-note__amount--income { color: #74d9cb; }
   font-size: 0.8125rem;
   font-weight: 800;
 }
+.profile-trigger { display: grid; place-items: center; flex-shrink: 0; min-width: 44px; min-height: 44px; padding: 0; border: 0; border-radius: 50%; background: transparent; cursor: pointer; }
+.profile-trigger:focus-visible { outline: 3px solid var(--teal); outline-offset: 3px; }
+.topbar__actions { flex-shrink: 0; }
+.desktop-sidebar__brand > div { min-width: 0; }
+.desktop-header > div:first-child { min-width: 0; overflow-wrap: anywhere; }
 .avatar {
+  flex-shrink: 0;
   width: 2rem;
   height: 2rem;
   border-radius: 999px;
@@ -611,8 +689,13 @@ html.theme-dark .saved-note__amount--income { color: #74d9cb; }
 }
 .content-grid {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 1.5rem;
   margin-top: 1.65rem;
+}
+.budget-section,
+.side-widgets {
+  min-width: 0;
 }
 .section-heading,
 .savings-card__heading {
@@ -974,6 +1057,10 @@ html.theme-dark .dashboard-page {
   background: #74d9cb;
 }
 @media (min-width: 48rem) {
+  .content-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
   .dashboard-content {
     padding: 1.75rem 2rem 3rem;
   }
@@ -1057,7 +1144,7 @@ html.theme-dark .dashboard-page {
     padding: 2.5rem 3rem;
   }
   .content-grid {
-    grid-template-columns: minmax(0, 1.5fr) minmax(16rem, 0.9fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: start;
   }
   .side-widgets {

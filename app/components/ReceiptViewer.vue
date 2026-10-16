@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import type { ReceiptAttachment } from '~/utils/receipts'
 
 const dialog = ref<HTMLDialogElement | null>(null)
@@ -25,7 +25,7 @@ function close() {
   receipt.value = undefined
 }
 function backdropClick(event: MouseEvent) {
-  if (event.target !== dialog.value) return
+  if (event.target !== dialog.value || !dialog.value) return
   const bounds = dialog.value.getBoundingClientRect()
   if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) close()
 }
@@ -55,7 +55,8 @@ defineExpose({ open, close })
         <button type="button" aria-label="Tutup foto struk" autofocus @click="close"><span class="material-symbols-outlined" aria-hidden="true">close</span></button>
       </header>
       <div class="receipt-image-area" :class="{ zoomed }" tabindex="0" role="region" aria-label="Gambar struk, dapat digulir">
-        <img :src="receipt.dataUrl" alt="Foto struk tersimpan">
+        <p v-if="!receipt.dataUrl">Foto belum bisa dimuat. Metadata struk tetap tersimpan. Muat ulang saat koneksi tersedia.</p>
+        <img v-else :src="receipt.dataUrl" alt="Foto struk tersimpan">
       </div>
       <footer>
         <span>Geser untuk melihat seluruh struk.</span>
@@ -86,4 +87,6 @@ img { display: block; max-width: 100%; height: auto; margin: 0 auto; background:
 footer { border-top: 1px solid var(--line); color: var(--muted); font-size: .7rem; }
 @media (max-width: 639px) { .receipt-viewer { width: calc(100% - 1rem); max-width: calc(100% - 1rem); max-height: 95dvh; } header, footer { padding: .8rem; gap: .5rem; } .receipt-image-area { padding: .5rem; } }
 </style>
+
+
 

@@ -2,6 +2,10 @@ import { defaultCategories as noteCategories, type CategoryCatalog } from './cat
 export { defaultCategories as noteCategories } from './categories'
 import { isReceiptAttachment, type ReceiptAttachment } from './receipts'
 
+export interface WalletTransfer { amount: number; account: string; direction: 'deposit' | 'withdraw'; date: string }
+export function reservedSavings(transfers: WalletTransfer[], today: string): number {
+  return transfers.filter(item => item.date <= today).reduce((sum, item) => sum + (item.direction === 'deposit' ? item.amount : -item.amount), 0)
+}
 export type NoteType = 'expense' | 'income'
 export interface MoneyNote {
   id: string
@@ -25,13 +29,24 @@ export const noteAccounts = [
 // The existing demo total is split between wallets; these are not connected bank balances.
 export const openingWalletTotal = noteAccounts.reduce((total, account) => total + account.openingBalance, 0)
 
-export function getAccountBalances(notes: MoneyNote[], today: string): Record<string, number> {
-  const balances = Object.fromEntries(noteAccounts.map(account => [account.id, account.openingBalance]))
+export function getAccountBalances(notes: MoneyNote[], today: string, transfers: WalletTransfer[] = [], openings?: Record<string, number>): Record<string, number> {
+  const balances = Object.fromEntries(noteAccounts.map(account => [account.id, openings?.[account.id] ?? account.openingBalance]))
   for (const note of notes) {
     if (note.date <= today && Object.hasOwn(balances, note.account)) {
       balances[note.account] = (balances[note.account] ?? 0) + (note.type === 'income' ? note.amount : -note.amount)
     }
   }
+  for (const item of transfers) {
+    if (item.date > today) continue
+    const amount = item.direction === 'deposit' ? item.amount : -item.amount
+    balances[item.account] = (balances[item.account] ?? 0) - amount
+    balances.savings = (balances.savings ?? 0) + amount
+  }
+  return balances
+}
+export function getSpendableBalances(notes: MoneyNote[], today: string, transfers: WalletTransfer[] = [], openings?: Record<string, number>): Record<string, number> {
+  const balances = getAccountBalances(notes, today, transfers, openings)
+  balances.savings = (balances.savings ?? 0) - reservedSavings(transfers, today)
   return balances
 }
 
@@ -89,12 +104,12 @@ export function summarizeNotes(notes: MoneyNote[], today: string) {
 }
 
 export function noteFingerprint(note: MoneyNote) {
-  return JSON.stringify([note.id, note.createdAt, note.type, note.amount, note.category, note.account, note.date, note.description, note.receipt?.name, note.receipt?.dataUrl])
+  return JSON.stringify([note.id, note.createdAt, note.type, note.amount, note.category, note.account, note.date, note.description, note.receipt?.name, note.receipt?.path ?? note.receipt?.dataUrl])
 }
 
 // Compute the complete replacement first, so old expenses are not charged twice and
 // an income moved/deleted from a wallet cannot leave spent funds unsupported.
-export function reviseNote(current: MoneyNote[], original: MoneyNote, draft: NoteDraft | null, today: string, categories: CategoryCatalog = noteCategories): MoneyNote[] {
+export function reviseNote(current: MoneyNote[], original: MoneyNote, draft: NoteDraft | null, today: string, categories: CategoryCatalog = noteCategories, transfers: WalletTransfer[] = [], openings?: Record<string, number>): MoneyNote[] {
   const latest = current.find(note => note.id === original.id)
   if (!latest) throw new Error('Catatan tidak ditemukan. Tutup detail lalu periksa riwayat kembali.')
   if (noteFingerprint(latest) !== noteFingerprint(original)) throw new Error('Catatan sudah berubah. Tutup detail lalu buka kembali sebelum mencoba lagi.')
@@ -104,7 +119,7 @@ export function reviseNote(current: MoneyNote[], original: MoneyNote, draft: Not
     type: draft.type, amount: draft.amount, category: draft.category, account: draft.account,
     date: draft.date, description: draft.description.trim(), ...(draft.receipt ? { receipt: draft.receipt } : {}),
   } : note) : current.filter(note => note.id !== original.id)
-  const balances = getAccountBalances(next, today)
+  const balances = getSpendableBalances(next, today, transfers, openings)
   const invalid = noteAccounts.find(account => (balances[account.id] ?? 0) < 0)
   if (invalid) throw new Error('Perubahan membuat saldo ' + invalid.label + ' tidak cukup. Sesuaikan transaksi terkait atau pilih dompet lain.')
   return next

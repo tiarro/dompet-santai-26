@@ -1,49 +1,37 @@
-import { addCategory, categoryCatalog, readCategories, type CategoryDraft, type CustomCategory } from '~/utils/categories'
+import { addCategory, categoryCatalog, type CategoryCatalog, type CategoryDraft, type CustomCategory } from '~/utils/categories'
+import { useCloudFinance } from './useCloudFinance'
 
 export function useCategories() {
-  const user = useSupabaseUser()
-  const custom = ref<CustomCategory[]>([])
-  const ready = ref(false)
-  const storageError = ref('')
-  const key = computed(() => user.value?.sub ? 'dompet-santai-categories-v1:' + user.value.sub : null)
+  const cloud = useCloudFinance()
+  const custom = computed(() => cloud.data.value.customCategories)
   const catalog = computed(() => categoryCatalog(custom.value))
-  function readLatest() {
-    if (!key.value) throw new Error('Silakan masuk kembali sebelum menggunakan kategori.')
-    const rows = readCategories(localStorage.getItem(key.value))
-    custom.value = rows
-    return categoryCatalog(rows)
+  const ready = cloud.ready
+  const storageError = cloud.error
+
+  async function save(draft: CategoryDraft) {
+    const rows = addCategory(custom.value, draft, 'custom-' + crypto.randomUUID())
+    await cloud.save({ ...cloud.data.value, customCategories: rows })
+    return rows[rows.length - 1]!
   }
-  function refresh() {
-    custom.value = []
-    ready.value = false
-    storageError.value = ''
-    if (!key.value) return
-    try { readLatest(); ready.value = true }
-    catch { storageError.value = 'Kategori di browser belum bisa dibaca. Muat ulang atau periksa izin penyimpanan browser.' }
+
+  async function update(original: CustomCategory, draft: Pick<CustomCategory, 'label' | 'icon' | 'archived'>) {
+    const current = custom.value
+    const old = current.find(item => item.id === original.id)
+    if (!old || JSON.stringify(old) !== JSON.stringify(original)) {
+      throw new Error('Kategori sudah berubah. Buka ulang pengaturan kategori.')
+    }
+    const validated = addCategory(current.filter(item => item.id !== old.id), { ...draft, type: old.type }, old.id).at(-1)!
+    const result = { ...validated, ...(draft.archived ? { archived: true } : {}) }
+    const rows = current.map(item => item.id === old.id ? result : item)
+    await cloud.save({ ...cloud.data.value, customCategories: rows })
+    return result
   }
-  function save(draft: CategoryDraft) {
-    if (!key.value || !ready.value) throw new Error(storageError.value || 'Kategori belum siap. Coba muat ulang.')
-    let current: CustomCategory[]
-    try { current = readCategories(localStorage.getItem(key.value)) }
-    catch { throw new Error('Kategori belum bisa dibaca. Muat ulang sebelum mencoba lagi.') }
-    custom.value = current
-    const next = addCategory(current, draft, 'custom-' + crypto.randomUUID())
-    try { localStorage.setItem(key.value, JSON.stringify(next)) }
-    catch { throw new Error('Kategori belum tersimpan. Periksa ruang dan izin penyimpanan browser, lalu coba lagi.') }
-    custom.value = next
-    return next[next.length - 1]!
+
+  return {
+    custom, catalog, ready, storageError,
+    save, update,
+    readLatest: () => catalog.value,
   }
-  function onStorage(event: StorageEvent) { if (event.key === key.value || event.key === null) refresh() }
-  let stop: (() => void) | undefined
-  onMounted(() => {
-    stop = watch(key, refresh, { immediate: true })
-    window.addEventListener('storage', onStorage)
-    window.addEventListener('focus', refresh)
-  })
-  onBeforeUnmount(() => {
-    stop?.()
-    window.removeEventListener('storage', onStorage)
-    window.removeEventListener('focus', refresh)
-  })
-  return { catalog, ready, storageError, save, readLatest }
 }
+
+

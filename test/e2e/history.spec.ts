@@ -1,3 +1,4 @@
+import { mockFinanceApi } from './cloud-fixture'
 import { expect, test, type Page } from '@playwright/test'
 
 test.use({ launchOptions: { args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] } })
@@ -7,6 +8,16 @@ const storageKey = 'dompet-santai-notes-v1:' + userId
 
 // Authentication is mocked in the browser: no real account or database writes.
 async function signIn(page: Page, id = userId) {
+  // Install the navigation guard first so the more specific mocked storage
+  // routes can take precedence for signed receipt URLs.
+  await page.route('http://localhost:3000/**', async route => {
+    if (route.request().isNavigationRequest()) {
+      const headers = { ...route.request().headers() }
+      delete headers.cookie
+      await route.continue({ headers })
+    } else await route.continue()
+  })
+  await mockFinanceApi(page, id)
   const user = { id, aud: 'authenticated', role: 'authenticated', email: 'notes@example.com', app_metadata: {}, user_metadata: {}, created_at: '2026-01-01T00:00:00Z' }
   const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url')
   const token = encode({ alg: 'HS256', typ: 'JWT' }) + '.' + encode({
@@ -24,13 +35,6 @@ async function signIn(page: Page, id = userId) {
     }
   })
   // Prevent server-side verification of the fake test session; client auth requests remain mocked.
-  await page.route('http://localhost:3000/**', async route => {
-    if (route.request().isNavigationRequest()) {
-      const headers = { ...route.request().headers() }
-      delete headers.cookie
-      await route.continue({ headers })
-    } else await route.continue()
-  })
   await page.goto('/login')
   await page.waitForFunction(() => (document.querySelector('#__nuxt') as any)?.__vue_app__?.$nuxt?.isHydrating === false)
   await page.getByLabel('Alamat email').fill(user.email)
@@ -261,6 +265,7 @@ test('history supports empty state, mobile filters and both themes', async ({ pa
   await page.screenshot({ path: 'test-results/history-mobile-light.png', fullPage: true })
   const light = await page.locator('.history-group ul').evaluate(el => getComputedStyle(el).backgroundColor)
   await page.getByRole('button', { name: 'Gunakan mode gelap' }).click()
+  await expect(page.locator('html')).toHaveClass(/theme-dark/)
   expect(await page.locator('.history-group ul').evaluate(el => getComputedStyle(el).backgroundColor)).not.toBe(light)
   await page.evaluate(() => window.scrollTo(0, 0))
   await page.screenshot({ path: 'test-results/history-mobile-dark.png', fullPage: true })
@@ -273,6 +278,7 @@ test('history supports empty state, mobile filters and both themes', async ({ pa
   await page.setViewportSize({ width: 1440, height: 1000 })
   await page.screenshot({ path: 'test-results/history-desktop-dark.png', fullPage: true })
   await page.getByRole('button', { name: 'Gunakan mode terang' }).click()
+  await expect(page.locator('html')).not.toHaveClass(/theme-dark/)
   await page.screenshot({ path: 'test-results/history-desktop-light.png', fullPage: true })
 })
 test('history loads every transaction and restores list scroll after viewing details', async ({ page }) => {

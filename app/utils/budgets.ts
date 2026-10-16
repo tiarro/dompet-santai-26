@@ -1,9 +1,24 @@
 import type { CategoryCatalog } from './categories'
+import { formatRupiah } from './currency'
 import { maxNoteAmount, noteAccounts, noteCategories, validNoteDate, type MoneyNote, type NoteDraft } from './notes'
 
 export interface MonthlyBudget { month: string; category: string; limit: number; defaultAccount?: string }
 export type BudgetMode = 'create' | 'update'
 export type BudgetStatus = 'safe' | 'near-limit' | 'reached' | 'exceeded'
+
+export function budgetAccountError(draft: Pick<MonthlyBudget, 'limit' | 'defaultAccount'>, balances: Record<string, number>): string {
+  if (!draft.defaultAccount || !Number.isSafeInteger(draft.limit) || draft.limit <= 0) return ''
+  const balance = balances[draft.defaultAccount]
+  if (balance === undefined) return 'Dompet pilihan belum tersedia. Pilih dompet lain atau hapus pilihan default.'
+  if (draft.limit <= balance) return ''
+  const label = noteAccounts.find(account => account.id === draft.defaultAccount)?.label ?? 'dompet pilihan'
+  return 'Saldo ' + label + ' (' + formatRupiah(balance) + ') lebih kecil dari batas anggaran. Kurangi batas atau pilih dompet lain.'
+}
+
+export function requiredExpenseAccount(draft: Pick<NoteDraft, 'type' | 'category' | 'date'>, budgets: MonthlyBudget[]): string | undefined {
+  if (draft.type !== 'expense' || draft.category === 'other' || !validNoteDate(draft.date)) return undefined
+  return budgets.find(budget => budget.category === draft.category && budget.month === draft.date.slice(0, 7))?.defaultAccount
+}
 
 export function expenseBudgetError(draft: Pick<NoteDraft, 'type' | 'category' | 'date'>, budgets: MonthlyBudget[]): string {
   if (draft.type !== 'expense' || !validNoteDate(draft.date)) return ''

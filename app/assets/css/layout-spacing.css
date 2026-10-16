@@ -1,0 +1,72 @@
+/* Shared spacing for the five dashboard routes and their editors, in both themes. */
+html .dashboard-page {
+  --space-small: .5rem;
+  --space-content: 1rem;
+  --space-section: 1.5rem;
+  --page-gutter: 1.25rem;
+  --page-padding: 1.5rem;
+  --card-padding: 1rem;
+}
+html .dashboard-page .dashboard-content {
+  padding: var(--page-padding) var(--page-gutter) var(--space-section);
+}
+html .dashboard-page .topbar { padding-inline: var(--page-gutter); }
+html .dashboard-page .desktop-header { padding: var(--space-section) var(--page-gutter); }
+html .dashboard-page :is(.settings-heading, .savings-heading, .budget-overview > .page-heading, .history-page > .history-heading) {
+  gap: var(--space-content);
+  margin: 0 0 var(--space-section);
+}
+html .dashboard-page :is(.settings-heading, .savings-heading, .budget-overview > .page-heading, .history-page > .history-heading) p { margin: 0; }
+html .dashboard-page :is(.settings-heading, .savings-heading, .budget-overview > .page-heading, .history-page > .history-heading) h2 { margin: var(--space-small) 0; }
+html .dashboard-page .intro { padding: 0; margin-bottom: var(--space-section); }
+html .dashboard-page .intro p { margin-top: var(--space-small); }
+html .dashboard-page :is(.summary-grid, .content-grid, .side-widgets, .metrics, .category-cards, .history-summary, .savings-summary, .target-grid, .wallet-grid, .preferences-grid, .history-toolbar, .history-filters, .date-range) { gap: var(--space-content); }
+html .dashboard-page :is(.summary-card, .budget-card, .widget-card, .summary-metrics > div, .category-card, .history-summary article, .savings-summary article, .target-card, .goal-detail, .savings-history, .settings-card, .detail-card, .unbudgeted, .transactions) { padding: var(--card-padding); }
+html .dashboard-page :is(.summary-grid, .content-grid, .recent-notes, .history-summary, .savings-history, .unbudgeted, .transactions, .detail-metrics) { margin-top: var(--space-section); }
+html .dashboard-page :is(.settings-links, .period-row, .summary-metrics, .savings-summary, .settings-card) { margin-bottom: var(--space-section); }
+html .dashboard-page .preferences-grid { margin-bottom: var(--space-section); }
+html .dashboard-page .preferences-grid .settings-card { margin-bottom: 0; }
+html .dashboard-page :is(.settings-links, .target-filters, .actions, .detail-actions, .editor-footer) { gap: var(--space-small); }
+html .dashboard-page :is(.actions, .detail-actions, .editor-footer) { margin-top: var(--space-content); }
+html .dashboard-page .settings-save .actions { margin-top: 0; }
+html .dashboard-page .target-filters { margin: var(--space-section) 0; }
+html .dashboard-page .list-heading { margin: var(--space-section) 0 var(--space-content); }
+html .dashboard-page .settings-card .section-heading { gap: var(--space-content); margin-bottom: var(--space-content); }
+html .dashboard-page :is(.history-row, .wallet-setting, .category-fields, .reminders) { padding: var(--space-content); }
+html .dashboard-page :is(.history-empty, .savings-empty, .empty-state) { padding: calc(var(--space-section) * 2) var(--card-padding); margin-top: var(--space-content); }
+html .dashboard-page :is(.profile-content, .note-fields) { padding: var(--card-padding); }
+html .dashboard-page :is(.profile-header, .note-header, .receipt-viewer > header, .receipt-camera > header) { padding: var(--space-content) var(--card-padding); }
+html .dashboard-page :is(.budget-editor, .savings-editor, .settings-dialog, .history-detail) { padding: var(--card-padding); }
+html .dashboard-page :is(.profile-content, .note-fields, .savings-editor, .history-detail) { padding-bottom: max(var(--card-padding), env(safe-area-inset-bottom)); }
+html .dashboard-page .desktop-sidebar__nav { gap: var(--space-small); }
+html .dashboard-page .desktop-sidebar__item { padding-block: var(--space-content); }
+@media (min-width: 48rem) {
+  html .dashboard-page { --page-gutter: 2rem; --page-padding: 2rem; --card-padding: 1.5rem; }
+}
+
+/* Home uses one spacing scale for section gaps, column gaps and card padding. */
+html .dashboard-page .home-content {
+  --home-space: 1rem;
+  display: grid;
+  gap: var(--home-space);
+  padding: var(--home-space) var(--page-gutter);
+}
+html .dashboard-page .home-content > * { min-width: 0; margin-block: 0; }
+html .dashboard-page .home-content :is(.summary-grid, .content-grid, .side-widgets, .budget-list) {
+  gap: var(--home-space);
+}
+html .dashboard-page .home-content :is(.summary-card, .widget-card, .budget-card, .preview-notice) {
+  padding: var(--home-space);
+}
+html .dashboard-page .home-content :is(.budget-list, .note-list) { margin-top: var(--home-space); }
+html .dashboard-page .home-content :is(.section-heading, .savings-card__heading) {
+  gap: var(--space-small);
+  flex-wrap: wrap;
+}
+html .dashboard-page .home-content .widget-card > p { margin: var(--home-space) 0 0; line-height: 1.6; }
+html .dashboard-page .home-content .notes-empty { padding: var(--home-space) 0; }
+html .dashboard-page .home-content .saved-note { padding-block: var(--home-space); gap: var(--space-content); }
+html .dashboard-page .home-content .side-widgets { position: static; }
+@media (min-width: 48rem) {
+  html .dashboard-page .home-content { --home-space: 1.5rem; }
+}
