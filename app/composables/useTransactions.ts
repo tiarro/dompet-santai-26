@@ -1,5 +1,8 @@
 import type { Database, TransactionInsert, TransactionRow } from '#shared/types/database'
 
+// Compatibility access for callers that need the normalized transactions table.
+// The application ledger itself uses useCloudFinance() so the snapshot RPC remains
+// the single read/write path for the complete finance state.
 export function useTransactions() {
   const supabase = useSupabaseClient<Database>()
 
@@ -7,7 +10,8 @@ export function useTransactions() {
     const { data, error } = await supabase
       .from('transactions')
       .select('*')
-      .order('occurred_at', { ascending: false })
+      .order('occurred_on', { ascending: false })
+      .order('created_at', { ascending: false })
 
     if (error) throw error
     return data

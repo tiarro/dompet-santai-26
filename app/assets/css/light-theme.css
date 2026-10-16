@@ -1,0 +1,132 @@
+/* Blue velvet, white and soft blue palette. Dark mode continues to use the existing component styles. */
+html:not(.theme-dark) {
+  --light-canvas: #f5f7fc;
+  --light-nav: #ffffff;
+  --light-surface: #ffffff;
+  --light-header: #f0f4fc;
+  --light-input: #ffffff;
+  --light-accent: #edf3ff;
+  --light-selected: #dfeaff;
+  --light-line: #dce3ef;
+  --light-ink: #202c43;
+  --light-muted: #657189;
+  --light-primary: #233b6e;
+  --light-primary-hover: #182b53;
+  --light-hover: #e7f0ff;
+  background: var(--light-canvas);
+}
+html:not(.theme-dark) body { background: var(--light-canvas); }
+html:not(.theme-dark) :is(.dashboard-page, .login-page, .onboarding-backdrop) {
+  --teal: var(--light-primary);
+  --teal-dark: var(--light-primary-hover);
+  --teal-pale: var(--light-selected);
+  --teal-soft: var(--light-accent);
+  --ink: var(--light-ink);
+  --muted: var(--light-muted);
+  --line: var(--light-line);
+  --canvas: var(--light-canvas);
+  --surface: var(--light-surface);
+  --danger: #b4513d;
+  background: var(--canvas);
+}
+html:not(.theme-dark) .dashboard-page :is(.topbar, .bottom-nav, .desktop-sidebar, .desktop-header) {
+  background: var(--light-nav);
+  border-color: var(--line);
+}
+html:not(.theme-dark) .dashboard-page :is(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]), textarea, select, .detail-control) {
+  background: var(--light-input);
+  border-color: var(--light-primary);
+}
+html:not(.theme-dark) .dashboard-page :is(.profile-header, .note-header, .receipt-viewer > header, .receipt-camera > header) {
+  background: var(--light-header);
+  border-bottom-color: var(--line);
+}
+html:not(.theme-dark) .dashboard-page :is(.profile-email, .saved-note__icon, .goal-icon, .category-icon, .section-heading > .material-symbols-outlined, .heading-icon) {
+  background: var(--light-accent);
+}
+html:not(.theme-dark) .dashboard-page .profile-email { border-color: var(--line); }
+html:not(.theme-dark) .dashboard-page :is(.desktop-sidebar__item--active, .target-filters button[aria-pressed="true"]) {
+  background: var(--light-selected);
+}
+html:not(.theme-dark) .dashboard-page .bottom-nav__item--active .material-symbols-outlined {
+  background: var(--light-selected);
+  border-radius: .5rem;
+  box-shadow: 0 0 0 .2rem var(--light-selected);
+}
+html:not(.theme-dark) .dashboard-page :is(.desktop-sidebar__item:hover, .icon-button:hover) { background: var(--light-header); }
+html:not(.theme-dark) .dashboard-page .note-dialog { --note-selected: var(--light-selected); }
+html:not(.theme-dark) .dashboard-page .budget-card--low { background: #fbefe7; border-color: #e7c9bc; }
+html:not(.theme-dark) .dashboard-page .budget-card--safe .budget-icon { background: var(--light-accent); }
+html:not(.theme-dark) .dashboard-page .weekly-summary { background: var(--light-accent); border-color: var(--line); }
+html:not(.theme-dark) .dashboard-page .weekly-summary :is(strong, .weekly-summary__icon) { color: var(--teal); }
+html:not(.theme-dark) .dashboard-page .bill-icon { background: var(--light-header); }
+html:not(.theme-dark) .dashboard-page .progress-track { background: var(--line); }
+html:not(.theme-dark) .dashboard-page .savings-progress__track { stroke: var(--line); }
+html:not(.theme-dark) .theme-toggle { color: var(--light-muted); }
+html:not(.theme-dark) .theme-toggle:hover { background: var(--light-header); }
+html:not(.theme-dark) .theme-toggle:hover .theme-toggle__orb { background: var(--light-selected); }
+
+/* Match the entry screens to the same light palette. */
+html:not(.theme-dark) .login-page .login-panel { background: var(--light-canvas); }
+html:not(.theme-dark) .login-page :is(.input-wrap, .google-button) { background: var(--light-surface); border-color: var(--light-line); }
+html:not(.theme-dark) .login-page .input-wrap:focus-within { border-color: var(--teal); }
+html:not(.theme-dark) .login-page .divider::after { background: var(--light-line); }
+html:not(.theme-dark) .onboarding-backdrop {
+  --primary: var(--light-primary);
+  --primary-hover: var(--light-primary-hover);
+  --card: var(--light-input);
+  --track: var(--light-line);
+  --accent-soft: var(--light-accent);
+  --selected: var(--light-selected);
+  --placeholder: var(--light-muted);
+  --error: #b4513d;
+}
+
+/* Blue accents also replace fixed teal colors in shared controls. */
+html:not(.theme-dark) .dashboard-page :is(.primary, .category-save) { background: var(--light-primary); border-color: var(--light-primary); }
+html:not(.theme-dark) .dashboard-page .summary-card--primary { background: var(--light-primary); border-color: var(--light-primary); color: #fff; }
+html:not(.theme-dark) .dashboard-page .summary-card--primary :is(.summary-card__label, .summary-card__label .material-symbols-outlined, .summary-card__helper) { color: #e7efff; }
+html:not(.theme-dark) .dashboard-page .budget-card--safe :is(.budget-icon, .budget-card__detail) { color: var(--light-primary); }
+html:not(.theme-dark) .dashboard-page .budget-card--safe .progress-value { background: var(--light-primary); }
+html:not(.theme-dark) .theme-toggle:focus-visible { outline-color: var(--light-primary); }
+html:not(.theme-dark) .theme-toggle:hover .theme-toggle__orb { color: var(--light-primary-hover); }
+html:not(.theme-dark) .login-page .login-visual::before {
+  background: radial-gradient(circle at 75% 20%, rgb(151 187 248 / 25%), transparent 35%), linear-gradient(145deg, #182b53, #233b6e 56%, #36558f);
+}
+html:not(.theme-dark) .login-page .visual-content h1 em { color: #dce9ff; }
+html:not(.theme-dark) .login-page .brand-mark { background: var(--light-selected); color: var(--light-primary-hover); }
+
+/* Hover uses soft blue with velvet text to retain readable contrast. */
+@media (hover: hover) {
+  html:not(.theme-dark) .dashboard-page :is(.primary, .secondary, .category-save, .save-button, .save-note, .desktop-add-note, .add-note, .desktop-sidebar__item, .bottom-nav__item, .icon-button, .profile-trigger, .photo-button, .close-button, .text-button, .view-receipt, .category-add, .category-cancel, .target-filters button, .category-card, .target-card, .history-row, .settings-links a):hover:not(:disabled):not([aria-disabled="true"]) {
+    background: var(--light-hover);
+    color: var(--light-primary);
+  }
+  html:not(.theme-dark) .dashboard-page :is(.primary, .secondary, .category-save, .save-button, .save-note, .desktop-add-note, .category-card, .target-card, .settings-links a):hover:not(:disabled) { border-color: #b7cdf2; }
+  html:not(.theme-dark) .dashboard-page .bottom-nav__item:hover .material-symbols-outlined { background: var(--light-hover); box-shadow: none; }
+  html:not(.theme-dark) .theme-toggle:hover,
+  html:not(.theme-dark) .theme-toggle:hover .theme-toggle__orb { background: var(--light-hover); color: var(--light-primary); }
+  html:not(.theme-dark) .login-page :is(.submit-button, .google-button, .visibility-button, .forgot-link):hover:not(:disabled),
+  html:not(.theme-dark) .onboarding-backdrop :is(.continue-button, .back-button):hover:not(:disabled) { background: var(--light-hover); color: var(--light-primary); }
+  html:not(.theme-dark) .onboarding-backdrop .goal-option:hover .goal-content { background: var(--light-hover); border-color: #b7cdf2; }
+}
+
+/* White input surfaces with velvet borders, including controls inside wrappers. */
+html:not(.theme-dark) .dashboard-page #profil input[type="email"] { background: var(--light-input); border-color: var(--light-primary); }
+html:not(.theme-dark) .login-page .input-wrap,
+html:not(.theme-dark) .onboarding-backdrop :is(.nickname-input, .payday-select, .balance-field) { background: var(--light-input); border-color: var(--light-primary); }
+html:not(.theme-dark) .dashboard-page .amount-entry { background: var(--light-input); border: 1px solid var(--light-primary); padding: .5rem; }
+html:not(.theme-dark) .dashboard-page .detail-control :is(input, select),
+html:not(.theme-dark) .dashboard-page .amount-entry input,
+html:not(.theme-dark) .login-page .input-wrap input,
+html:not(.theme-dark) .onboarding-backdrop .balance-field input { background: transparent; border: 0; }
+html:not(.theme-dark) :is(.dashboard-page, .onboarding-backdrop) :is(input, select, textarea)[aria-invalid="true"] { border-color: #b4513d; }
+html:not(.theme-dark) .dashboard-page .detail-control:has([aria-invalid="true"]),
+html:not(.theme-dark) .onboarding-backdrop .balance-field:has([aria-invalid="true"]) { border-color: #b4513d; }
+
+/* White financial summary cards with burnt-orange borders in light mode. */
+html:not(.theme-dark) .dashboard-page :is(.savings-summary > article, .summary-metrics > div, .history-summary > article, .summary-grid > .summary-card--neutral) {
+  background: #fff;
+  border-color: #b34b20;
+  color: var(--ink);
+}

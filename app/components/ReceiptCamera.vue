@@ -38,7 +38,7 @@ async function startCamera(deviceId?: string) {
     return
   }
   if (!navigator.mediaDevices?.getUserMedia) {
-    errorMessage.value = 'Browser ini belum mendukung kamera langsung. Gunakan browser terbaru atau pilih foto dari galeri.'
+    errorMessage.value = 'Kamera langsung belum tersedia. Pilih foto dari galeri.'
     starting.value = false
     return
   }

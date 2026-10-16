@@ -6,6 +6,22 @@ const backLabel = computed(() => activeStep.value > 1 ? 'Kembali ke langkah ' + 
 useHead(() => ({ title: activeStep.value === 3 ? 'Dompet Santai - Onboarding Selesai' : 'Dompet Santai - Onboarding' }))
 const draft = useState('onboarding-step-one', () => ({ nickname: '', goal: '' }))
 const finances = useState('onboarding-step-two', () => ({ payday: '25', balance: '', accounts: ['cash', 'bank', 'ewallet'] }))
+const cloud = useCloudFinance()
+const completing = ref(false)
+const completionError = ref('')
+async function completeOnboarding() {
+  if (completing.value) return
+  completing.value = true
+  completionError.value = ''
+  try {
+    await cloud.saveOnboarding({ username: draft.value.nickname.trim(), goal: draft.value.goal, payday: finances.value.payday, balance: balanceValue.value ?? 0, accounts: finances.value.accounts })
+    await navigateTo('/')
+  } catch (reason) {
+    completionError.value = reason instanceof Error ? reason.message : 'Onboarding belum tersimpan. Coba lagi.'
+  } finally {
+    completing.value = false
+  }
+}
 const attempted = ref(false)
 const heading = ref<HTMLHeadingElement | null>(null)
 const nicknameInput = ref<HTMLInputElement | null>(null)
@@ -65,8 +81,7 @@ async function continueOnboarding() {
       <div class="onboarding-progress">
         <div class="step-navigation">
           <NuxtLink class="back-button" :to="backTarget" :aria-label="backLabel">
-            <span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>
-          </NuxtLink>
+            <span class="material-symbols-outlined" aria-hidden="true">arrow_back</span></NuxtLink>
           <span>Langkah {{ activeStep }} dari 3</span>
           <ThemeToggle />
         </div>
@@ -166,7 +181,7 @@ async function continueOnboarding() {
               <span class="question-icon material-symbols-outlined" aria-hidden="true">category</span>
               <div>
                 <h2 id="accounts-heading">Uangnya disimpan di mana aja?</h2>
-                <p id="accounts-help">Pilih yang biasa kamu pakai, nanti kita bagi saldonya.</p>
+                <p id="accounts-help">Pilih dompet yang aktif. Total saldo awal akan disimpan utuh di dompet pertama yang dipilih.</p>
               </div>
             </div>
             <div class="account-options" role="group" aria-labelledby="accounts-heading" :aria-describedby="accountsError ? 'accounts-help accounts-error' : 'accounts-help'">
@@ -208,11 +223,12 @@ async function continueOnboarding() {
           </p>
         </div>
         <footer class="completion-footer">
-          <NuxtLink class="continue-button completion-button" to="/">
+          <button class="continue-button completion-button" type="button" :disabled="completing" @click="completeOnboarding">
             <span>Mulai Sekarang</span>
             <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
-          </NuxtLink>
+          </button>
         </footer>
+        <p v-if="completionError" class="field-error" role="alert">{{ completionError }}</p>
       </section>
     </div>
   </div>
@@ -574,3 +590,5 @@ h2 { font-size: 16px; line-height: 22px; }
 }
 
 </style>
+
+

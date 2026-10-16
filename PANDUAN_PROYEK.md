@@ -1,160 +1,105 @@
 # Panduan Struktur dan Penggunaan Dompet Santai
 
-Dokumen ini menjelaskan susunan proyek **Dompet Santai**, kegunaan setiap bagian, dan alur kerja yang disarankan saat mengembangkan aplikasi.
+Dokumen ini menjelaskan struktur proyek, penyimpanan cloud, migrasi data lama, PWA, dan alur kerja pengembangan Dompet Santai.
 
 ## Teknologi
 
-- **Nuxt 4** sebagai framework aplikasi full-stack.
-- **TypeScript** untuk penulisan kode yang bertipe.
-- **Supabase** untuk PostgreSQL dan layanan backend.
-- **Vitest** untuk pengujian unit.
-- **Playwright** untuk pengujian end-to-end di browser.
+- Nuxt 4 dan Vue 3 untuk aplikasi.
+- TypeScript untuk kontrak dan logika.
+- Supabase Auth, PostgreSQL, RPC, Row Level Security, dan Storage untuk backend.
+- Vite PWA untuk aplikasi yang dapat dipasang.
+- Vitest untuk unit test dan Playwright untuk E2E.
 
 ## Struktur proyek
 
-```text
-dompet-santai/
-├── app/                    # Kode aplikasi Vue/Nuxt di sisi pengguna
-│   ├── assets/             # Aset yang diproses Vite, misalnya CSS atau gambar
-│   ├── components/         # Komponen UI yang dapat dipakai ulang
-│   ├── composables/        # Logika Vue yang dapat dipakai ulang
-│   ├── layouts/            # Kerangka halaman bersama
-│   ├── middleware/         # Pemeriksaan sebelum perpindahan halaman
-│   ├── pages/              # Halaman dan route berbasis berkas
-│   ├── plugins/            # Plugin aplikasi di sisi klien/server
-│   ├── utils/              # Fungsi bantuan sisi aplikasi
-│   ├── app.config.ts       # Konfigurasi reaktif aplikasi
-│   ├── app.vue             # Komponen akar Nuxt
-│   └── error.vue           # Halaman saat terjadi error
-├── server/                 # Kode Nitro yang hanya berjalan di server
-│   ├── api/                # Endpoint API, misalnya /api/health
-│   ├── middleware/         # Middleware untuk request server
-│   ├── plugins/            # Plugin Nitro
-│   ├── routes/             # Route server non-API
-│   └── utils/              # Fungsi bantuan khusus server
-├── shared/                 # Kode/kontrak yang bisa dipakai app dan server
-│   └── types/              # Tipe TypeScript bersama, termasuk tipe Supabase
-├── supabase/
-│   └── migrations/         # Riwayat perubahan skema database dalam SQL
-├── test/
-│   ├── unit/               # Test Vitest
-│   └── e2e/                # Test Playwright
-├── public/                 # Berkas statis tanpa pemrosesan build
-├── content/                # Cadangan untuk Nuxt Content jika modulnya ditambahkan
-├── layers/                 # Cadangan untuk Nuxt Layers
-├── modules/                # Cadangan untuk modul Nuxt lokal
-├── nuxt.config.ts          # Konfigurasi utama Nuxt dan Supabase
-├── vitest.config.ts        # Konfigurasi Vitest
-├── playwright.config.ts    # Konfigurasi Playwright
-└── .env.example            # Contoh environment variable lokal
-```
+- app: halaman, komponen, composable, utilitas, dan aset UI.
+- server: endpoint Nitro yang memerlukan pemeriksaan server atau secret.
+- shared/types/database.ts: kontrak tabel dan fungsi Supabase.
+- supabase/migrations: migrasi SQL yang dijalankan pada proyek Supabase.
+- public: aset statis, ikon PWA, dan halaman offline.
+- test/unit dan test/e2e: pengujian logika dan alur browser.
+- nuxt.config.ts: konfigurasi Nuxt, Supabase, dan PWA.
 
-Direktori `.nuxt/`, `.output/`, `node_modules/`, dan `test-results/` dibuat otomatis. Jangan mengubah atau menyimpan hasil build tersebut sebagai kode sumber.
+Direktori .nuxt, .output, node_modules, dan test-results dibuat otomatis dan tidak disimpan sebagai kode sumber.
 
-## Bagian penting yang sudah ada
+## Persiapan lokal
 
-| Lokasi | Fungsi |
-| --- | --- |
-| `app/pages/index.vue` | Halaman beranda `/` dan contoh dashboard awal. |
-| `app/layouts/default.vue` | Layout standar yang membungkus seluruh halaman. |
-| `app/composables/useTransactions.ts` | Akses tabel `transactions` melalui Supabase. |
-| `app/utils/currency.ts` | Formatter angka ke format Rupiah. |
-| `server/api/health.get.ts` | Endpoint pengecekan aplikasi: `GET /api/health`. |
-| `shared/types/database.ts` | Kontrak TypeScript untuk tabel database. |
-| `supabase/migrations/20260810000000_create_transactions.sql` | Membuat tabel transaksi dan mengaktifkan Row Level Security (RLS). |
-| `test/unit/currency.test.ts` | Contoh unit test untuk formatter Rupiah. |
-| `test/e2e/home.spec.ts` | Contoh E2E test untuk halaman beranda. |
+Jalankan dari folder proyek:
 
-## Persiapan pertama
+    Copy-Item .env.example .env
+    npm install
+    npm run dev
 
-Pastikan Node.js versi modern yang kompatibel dengan Nuxt 4 sudah terpasang, kemudian jalankan dari folder proyek:
+Isi URL dan publishable key Supabase pada .env:
 
-```powershell
-npm install
-Copy-Item .env.example .env
-```
+    NUXT_PUBLIC_SUPABASE_URL=https://nama-proyek.supabase.co
+    NUXT_PUBLIC_SUPABASE_KEY=publishable-or-anon-key-anda
 
-Buka `.env`, lalu isi variabel berikut dari halaman **Connect** atau **API Keys** pada proyek Supabase Anda:
+SUPABASE_URL dan SUPABASE_PUBLISHABLE_KEY juga didukung. Variabel NUXT_PUBLIC_* boleh dibaca browser. SUPABASE_SECRET_KEY hanya untuk server dan tidak boleh memakai awalan NUXT_PUBLIC_.
 
-```dotenv
-NUXT_PUBLIC_SUPABASE_URL=https://nama-proyek.supabase.co
-NUXT_PUBLIC_SUPABASE_KEY=publishable-or-anon-key-anda
-```
+## Menyiapkan Supabase
 
-`NUXT_PUBLIC_SUPABASE_KEY` memang boleh dipakai oleh browser. Jangan pernah menaruh service role key dalam variabel `NUXT_PUBLIC_*` atau kode `app/`.
+Jalankan migrasi berikut secara berurutan di SQL Editor Supabase atau melalui workflow migrasi proyek:
 
-## Menyiapkan database Supabase
+1. supabase/migrations/20260810000000_create_transactions.sql adalah skema prototipe lama.
+2. supabase/migrations/20261008000000_create_finance_cloud_storage.sql membuat profil, pengaturan, dompet, kategori, transaksi, anggaran, target tabungan, perpindahan tabungan, penanda migrasi, RLS, dan RPC snapshot.
+3. supabase/migrations/20261008000001_create_receipts_storage.sql membuat bucket receipts privat dan policy Storage berdasarkan folder ID pengguna.
 
-1. Buat proyek baru di Supabase.
-2. Salin isi `supabase/migrations/20260810000000_create_transactions.sql` ke SQL Editor Supabase, lalu jalankan.
-3. Perbarui `.env` dengan URL dan publishable/anon key proyek tersebut.
-4. Buat kebijakan RLS sebelum aplikasi diizinkan membaca atau menulis data.
+Migrasi keuangan menggunakan auth.uid() sebagai pemilik. Tabel keuangan diberikan kepada role authenticated dan setiap operasi dibatasi policy per pengguna. Fungsi get_finance_snapshot dan replace_finance_snapshot hanya dapat dipanggil role authenticated. Jangan mengganti policy dengan using true.
 
-Migrasi saat ini sengaja hanya mengaktifkan RLS dan belum membuat policy. Dengan demikian akses dari klien akan ditolak sampai policy ditentukan. Contoh berikut hanya sesuai bila setiap pengguna yang terautentikasi memang boleh mengakses semua transaksi; untuk aplikasi nyata, batasi policy berdasarkan kolom pemilik seperti `user_id`.
+Jika proyek sudah pernah menjalankan migrasi lama, migrasi keuangan memindahkan tabel transactions lama menjadi transactions_legacy dan mencabut akses kliennya. Aplikasi memakai kontrak transaksi baru yang memiliki user_id, kategori, dompet, tanggal, dan path struk.
 
-```sql
-create policy "Authenticated users can read transactions"
-on public.transactions for select
-to authenticated
-using (true);
+## Sumber data aplikasi
 
-create policy "Authenticated users can add transactions"
-on public.transactions for insert
-to authenticated
-with check (true);
-```
+useCloudFinance() adalah sumber data utama. Data yang dikelola bersama dalam Supabase:
 
-Jika skema berubah, perbarui `shared/types/database.ts`. Bila memakai Supabase CLI, tipe dapat digenerasi ulang dengan pola berikut:
+- profil dan status onboarding;
+- tema, pengingat, saldo awal, dan dompet;
+- kategori tambahan;
+- pemasukan dan pengeluaran;
+- anggaran bulanan;
+- target serta perpindahan tabungan;
+- metadata struk, sementara isi foto berada di Storage privat.
 
-```powershell
-npx supabase gen types typescript --project-id ID_PROYEK --schema public > shared/types/database.ts
-```
+Aplikasi memuat ulang snapshot setelah navigasi atau ketika jendela kembali fokus. Tidak ada Realtime subscription. Saldo dan riwayat resmi menunggu RPC berhasil. Catatan baru saat offline disimpan di antrean IndexedDB per akun dan ditampilkan terpisah dengan status Menunggu sinkronisasi. Snapshot keuangan tidak disimpan dalam cache service worker.
 
-## Menjalankan aplikasi
+## Migrasi localStorage lama
 
-```powershell
-npm run dev
-```
+Data localStorage dari versi sebelumnya tetap dibaca sebagai sumber migrasi. Buka Pengaturan, lihat jumlah catatan, struk, anggaran, kategori, target, dan perpindahan, lalu pilih Migrasikan Data Browser. Migrasi membutuhkan koneksi internet, menyimpan snapshot melalui RPC, mencatat fingerprint pada finance_migrations, dan tidak menghapus data browser lama.
 
-Buka alamat yang ditampilkan terminal, biasanya `http://localhost:3000`. Untuk memeriksa endpoint server, buka `http://localhost:3000/api/health`; respons yang benar adalah `{"status":"ok"}`.
+Migrasi dapat diulang. Jika data browser rusak, kartu migrasi menampilkan error dan tidak menimpa data cloud. Setelah migrasi, cloud menjadi sumber utama dan data browser lama hanya menjadi cadangan.
 
-Untuk build produksi:
+## Backup, restore, dan reset
 
-```powershell
-npm run build
-npm run preview
-```
+Backup JSON dibuat dari snapshot cloud dan tidak berisi password, token, cookie, atau secret key. Restore menampilkan preview dan menolak penggantian jika fingerprint data berubah setelah preview. Reset mengosongkan data keuangan akun aktif melalui RPC; akun dan sesi Auth tetap dipertahankan.
 
-## Cara menambahkan fitur
+Foto struk diunggah sebagai JPEG ke bucket receipts dengan path berawalan ID pengguna. Policy Storage membatasi select, insert, update, dan delete ke folder pemilik. Jangan membuat bucket receipts menjadi public.
 
-1. Buat halaman baru di `app/pages/`. Contoh `app/pages/transaksi.vue` akan menjadi route `/transaksi`.
-2. Letakkan tampilan yang dapat digunakan ulang di `app/components/`.
-3. Letakkan logika klien yang dapat digunakan ulang di `app/composables/` atau `app/utils/`.
-4. Gunakan `useTransactions()` dari `app/composables/useTransactions.ts` untuk membaca atau menambah transaksi. Tangani error Supabase di halaman pemanggil agar pengguna mendapat pesan yang jelas.
-5. Untuk operasi yang membutuhkan rahasia atau validasi backend, buat endpoint di `server/api/`; jangan menaruh service role key di browser.
-6. Tambahkan atau perbarui migrasi SQL, tipe database, dan test bersamaan dengan perubahan fitur.
+## PWA online-first
 
-## Menjalankan test
+Aplikasi dikonfigurasi dengan @vite-pwa/nuxt. Build produksi menghasilkan service worker, manifest, ikon public/pwa.svg, dan fallback public/offline.html. Aset aplikasi dapat diprecache agar shell dapat dibuka saat koneksi terputus.
 
-Jalankan unit test:
+Data Supabase tidak dicache. Saat aplikasi sudah terbuka dan data akun tersedia, penambahan transaksi offline masuk ke antrean IndexedDB. Sinkronisasi saat aplikasi aktif memeriksa kembali saldo/anggaran, mempertahankan transaksi yang gagal, dan mencegah duplikasi dengan UUID tetap serta fingerprint snapshot. Membuka ulang aplikasi sepenuhnya offline dan Background Sync belum didukung. Detail ada di docs/offline-transactions.md. Instalasi PWA perlu diuji pada build produksi.
 
-```powershell
-npm run test:unit
-```
+## Menjalankan dan menguji
 
-Sebelum E2E test pertama kali, instal browser Chromium Playwright:
+    npm run test:unit
+    npm run build
+    npm run test:e2e
 
-```powershell
-npx playwright install chromium
-npm run test:e2e
-```
+E2E yang memakai Auth tiruan tidak mengubah database Supabase nyata. Pengujian cloud nyata memerlukan dua akun uji dan harus memeriksa RLS, Storage, RPC snapshot, migrasi, reset, restore, serta visibilitas data lintas perangkat.
 
-Playwright otomatis menyalakan server Nuxt sementara, membuka halaman beranda, lalu memeriksa judulnya. Pada Windows, proses dapat sesekali terlambat berhenti setelah semua test bertanda `ok`; lihat hasil assertion test sebelum menganggapnya gagal.
+Untuk pengujian dari HP di jaringan lokal:
 
-## Aturan pengembangan singkat
+    npm run dev -- --host 0.0.0.0
 
-- Simpan rahasia hanya dalam `.env`; `.env` tidak boleh di-commit.
-- Gunakan `shared/types/database.ts` agar data Supabase tetap bertipe.
-- Pisahkan UI (`app/`), API server (`server/`), dan kontrak bersama (`shared/`).
-- Tulis unit test untuk fungsi/logika kecil dan E2E test untuk alur pengguna.
-- Jalankan minimal `npm run test:unit` dan `npm run build` sebelum mengirim perubahan.
+Buka URL LAN yang ditampilkan Nuxt dari HP. Kamera browser dan beberapa fitur PWA dapat memerlukan HTTPS atau localhost; HTTP melalui IP LAN tidak memenuhi secure context untuk kamera.
+
+## Alur perubahan
+
+1. Perbarui tipe bersama jika kontrak Supabase berubah.
+2. Tulis migrasi baru untuk perubahan database, RLS, Storage, atau RPC.
+3. Perbarui useCloudFinance dan utilitas terkait.
+4. Tambahkan unit test untuk aturan data dan E2E untuk alur pengguna.
+5. Jalankan unit test, type check Nuxt bila tersedia, build, dan E2E yang relevan.
+6. Tinjau SQL untuk ownership, grant, policy, dan penghapusan data stale sebelum diterapkan ke proyek Supabase.
