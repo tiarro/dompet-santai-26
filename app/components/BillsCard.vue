@@ -113,7 +113,7 @@ onMounted(() => watch([() => route.query.bill, items, loading, () => props.ready
         <p v-else>{{ tab === 'pending' ? 'Belum ada tagihan mendatang.' : 'Belum ada tagihan yang ditandai lunas.' }}</p>
       </CardPagination>
     </div>
-    <dialog ref="editor" class="bill-dialog bill-editor" :aria-label="editing ? 'Ubah tagihan' : 'Tambah tagihan'" @cancel.prevent="close" @close="restoreScroll">
+    <dialog ref="editor" class="bill-dialog bill-editor" :aria-label="editing ? 'Ubah tagihan' : 'Tambah tagihan'" @cancel.stop.prevent @close="restoreScroll">
       <header class="bill-header"><h2>{{ editing ? 'Ubah tagihan' : 'Tambah tagihan' }}</h2></header>
       <form class="bill-form" :aria-busy="busy" @submit.prevent="submit">
         <div class="bill-fields">
@@ -132,7 +132,7 @@ onMounted(() => watch([() => route.query.bill, items, loading, () => props.ready
         <footer class="bill-footer bill-actions"><button type="button" :disabled="busy" @click="close">Batal</button><button type="submit" :disabled="busy">{{ busy ? 'Menyimpan…' : 'Simpan tagihan' }}</button></footer>
       </form>
     </dialog>
-    <dialog ref="confirmation" class="bill-dialog" :aria-label="action === 'paid' ? 'Konfirmasi lunas' : 'Hapus tagihan'" @cancel.prevent="!busy && confirmation?.close()" @close="restoreScroll">
+    <dialog ref="confirmation" class="bill-dialog" :aria-label="action === 'paid' ? 'Konfirmasi lunas' : 'Hapus tagihan'" @cancel.stop.prevent @close="restoreScroll">
       <h2>{{ action === 'paid' ? 'Tandai lunas?' : 'Hapus pengingat?' }}</h2><p>{{ selected?.name }}</p>
       <p>{{ action === 'paid' ? 'Ini hanya mengubah status pengingat. Saldo dan catatan pengeluaran tidak berubah.' : 'Pengingat ini akan dihapus. Saldo dompet tidak berubah.' }}</p>
       <p v-if="action === 'paid' && selected?.recurrence === 'monthly'">Pengingat bulan berikutnya akan dibuat otomatis.</p>

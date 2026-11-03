@@ -153,7 +153,7 @@ onBeforeUnmount(close)
       </section>
       <p class="footnote">Setoran dan penarikan merupakan transfer internal: total uang tetap sama, tanpa menambah pemasukan atau pengeluaran.</p>
     </template>
-    <dialog ref="editor" class="savings-editor" :aria-label="title" @cancel.prevent="requestClose">
+    <dialog ref="editor" class="savings-editor" :aria-label="title" @cancel.stop.prevent>
       <header><h2>{{ title }}</h2><button type="button" class="close-button" aria-label="Tutup form tabungan" :disabled="saving" @click="requestClose">×</button></header>
       <form novalidate :aria-busy="saving" @submit.prevent="submit">
         <template v-if="kind === 'goal'">

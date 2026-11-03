@@ -274,12 +274,6 @@ async function submit() {
   }
 }
 
-function backdropClick(event: MouseEvent) {
-  if (event.target !== dialog.value || !dialog.value) return
-  const bounds = dialog.value.getBoundingClientRect()
-  if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) requestClose()
-}
-
 function trapFocus(event: KeyboardEvent) {
   const elements = Array.from(dialog.value?.querySelectorAll<HTMLElement>(
     'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex="0"]',
@@ -300,7 +294,7 @@ defineExpose({ open, edit, close })
 </script>
 
 <template>
-  <dialog ref="dialog" class="note-dialog" aria-labelledby="note-dialog-title" aria-describedby="note-dialog-description" @keydown.tab="trapFocus" @cancel.prevent="requestClose" @click="backdropClick">
+  <dialog ref="dialog" class="note-dialog" aria-labelledby="note-dialog-title" aria-describedby="note-dialog-description" @keydown.tab="trapFocus" @cancel.stop.prevent>
     <div class="sheet-handle" aria-hidden="true" />
     <header class="note-header">
       <div class="note-heading">

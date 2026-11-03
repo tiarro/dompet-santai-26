@@ -193,7 +193,14 @@ export async function mockFinanceApi(page: Page, owner: string) {
       return
     }
     const body = route.request().postDataBuffer()
-    if (body) receipts.set(path, body)
+    if (body) {
+      const contentType = route.request().headers()['content-type'] ?? ''
+      if (contentType.startsWith('multipart/form-data')) {
+        const form = await new Response(new Uint8Array(body), { headers: { 'content-type': contentType } }).formData()
+        const photo = [...form.values()].find(value => typeof value !== 'string')
+        if (photo && typeof photo !== 'string') receipts.set(path, Buffer.from(await photo.arrayBuffer()))
+      } else receipts.set(path, body)
+    }
     await route.fulfill({ json: { Key: path } })
   })
   await page.route('**/storage/v1/object/sign/receipts/**', async route => {

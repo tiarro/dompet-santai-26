@@ -29,7 +29,7 @@ Jalankan tiga migrasi Supabase secara berurutan: supabase/migrations/20260810000
 
 Setelah migrasi diterapkan, aplikasi menggunakan Supabase sebagai sumber utama untuk profil onboarding, pengaturan, dompet, kategori, catatan transaksi, anggaran, target tabungan, perpindahan tabungan, dan foto struk. replace_finance_snapshot mengganti seluruh snapshot milik pengguna secara atomik dan menghapus baris lama yang sudah tidak ada dalam payload. get_finance_snapshot memuat data akun setelah navigasi atau saat jendela kembali fokus.
 
-Buka Pengaturan > Simpan ke Supabase untuk melihat jumlah data localStorage lama sebelum migrasi. Tombol migrasi memindahkan catatan, struk, anggaran, kategori, target, transfer, dan pengaturan; data browser asal tetap ada sebagai cadangan. Migrasi membutuhkan koneksi internet dan dapat diulang.
+Data tersimpan otomatis di akun Anda dan dapat diakses dari perangkat lain setelah login dengan akun yang sama. Fitur migrasi data browser sudah dihapus. Backup JSON, pemulihan backup, dan reset data keuangan tetap tersedia di Pengaturan; data browser lama tidak dihapus otomatis.
 
 Jangan menaruh SUPABASE_SECRET_KEY pada NUXT_PUBLIC_* atau kode app/. Secret key hanya dipakai endpoint server yang membutuhkannya. Uji RLS dengan dua akun sebelum memakai database produksi: setiap akun hanya boleh membaca dan menulis baris miliknya sendiri.
 
@@ -49,7 +49,7 @@ Struktur proyek mengikuti [Nuxt Directory Structure](https://nuxt.com/docs/4.x/d
 
 Tombol Tambah Catatan membuka modal desktop atau panel bawah di HP, mengikuti tema terang/gelap dashboard. Pengguna memilih pengeluaran/pemasukan, nominal rupiah bulat, kategori, rekening, tanggal sampai hari ini, dan keterangan opsional. Isian yang belum disimpan dikonfirmasi sebelum dibuang.
 
-Catatan aktif disimpan di Supabase melalui RPC snapshot dan RLS per akun. Data localStorage lama tetap dapat dibaca sebagai sumber migrasi satu kali; buka Pengaturan, tinjau jumlahnya, lalu pilih Migrasikan Data Browser. Setelah migrasi, perubahan dari perangkat lain dimuat ulang saat navigasi atau aplikasi kembali fokus. Pilihan rekening disimpan dalam data cloud akun. Rekening terakhir dipakai kembali jika masih tersedia.
+Catatan aktif disimpan di Supabase melalui RPC snapshot dan RLS per akun. Perubahan dari perangkat lain dimuat ulang saat navigasi atau aplikasi kembali fokus. Pilihan rekening disimpan dalam data cloud akun. Rekening terakhir dipakai kembali jika masih tersedia.
 
 Dashboard masih berupa pratinjau dengan saldo awal dan ringkasan harian contoh:
 - Saldo = total saldo awal di Pengaturan + pemasukan tercatat - pengeluaran tercatat. Bawaan awal Rp8.450.000 masih berupa contoh.
@@ -79,14 +79,14 @@ Menu Anggaran membuka halaman /anggaran. Pilih bulan kalender, buat batas per ka
 
 Ringkasan menghitung kategori yang memiliki anggaran; pengeluaran tanpa anggaran ditampilkan terpisah. Pengeluaran mengikuti tanggal catatan, dari semua dompet, tanpa pemasukan. Status aman di bawah 75%, mendekati batas mulai 75%, batas tercapai pada 100%, dan terlewati di atas 100%. Melewati anggaran memberi peringatan pada form catatan, tetapi tidak memblokir transaksi selama saldo dompet cukup. Urungkan catatan memperbarui anggaran kembali. Batas anggaran tidak memindahkan uang atau mengurangi saldo maupun dana tabungan di Beranda.
 
-Batas anggaran tersimpan di Supabase bersama data akun dan dimuat ulang saat aplikasi bernavigasi atau kembali fokus. Data localStorage lama dapat dipindahkan melalui kartu migrasi di Pengaturan. Tema terang/gelap dan navigasi desktop/HP mengikuti tampilan aplikasi.
+Batas anggaran tersimpan di Supabase bersama data akun dan dimuat ulang saat aplikasi bernavigasi atau kembali fokus. Tema terang/gelap dan navigasi desktop/HP mengikuti tampilan aplikasi.
 
 
 ## Kategori tambahan
 
 Tombol Tambah Kategori tersedia pada form Buat Anggaran dan Tambah Catatan. Isi nama 1-32 karakter dan pilih ikon; kategori langsung tersimpan dan terpilih tanpa menghapus isian anggaran/catatan. Nama duplikat dalam jenis yang sama ditolak, termasuk nama kategori bawaan, dengan mengabaikan besar/kecil huruf dan spasi berlebih.
 
-Kategori pengeluaran digunakan bersama oleh anggaran dan catatan; kategori pemasukan hanya tersedia untuk pemasukan. Kategori tambahan tersimpan di Supabase bersama data akun dan dilindungi RLS. Data localStorage lama ikut dipindahkan oleh migrasi dari Pengaturan. Membatalkan form catatan/anggaran tidak menghapus kategori yang sudah disimpan. Kategori tambahan dapat diubah dan diarsipkan melalui Pengaturan; belum ada penghapusan permanen kategori. Catatan lama dan kategori bawaan tetap kompatibel. Kegagalan penyimpanan kategori mempertahankan isian untuk dicoba kembali.
+Kategori pengeluaran digunakan bersama oleh anggaran dan catatan; kategori pemasukan hanya tersedia untuk pemasukan. Kategori tambahan tersimpan di Supabase bersama data akun dan dilindungi RLS. Membatalkan form catatan/anggaran tidak menghapus kategori yang sudah disimpan. Kategori tambahan dapat diubah dan diarsipkan melalui Pengaturan; belum ada penghapusan permanen kategori. Catatan lama dan kategori bawaan tetap kompatibel. Kegagalan penyimpanan kategori mempertahankan isian untuk dicoba kembali.
 
 ## Dompet default untuk anggaran
 
@@ -108,7 +108,7 @@ Tambah Tabungan memindahkan dana dari Tunai, Bank, atau E-Wallet ke satu target.
 
 Target berisi dana tidak dapat dihapus: tarik dahulu seluruh dana ke dompet. Penghapusan target kosong mempertahankan riwayatnya. Target arsip tetap menyisihkan dana dan mempertahankan riwayat; aktifkan kembali untuk menarik atau menambah dana. Target boleh menerima dana di atas nominal tujuan; progres visual dibatasi 100%, nominal asli tetap ditampilkan.
 
-Target dan transfer tabungan tersimpan di Supabase bersama transaksi dan dompet. Penyimpanan baru menampilkan hasil setelah RPC berhasil; RLS membatasi setiap akun pada datanya sendiri. Data localStorage lama dipindahkan melalui migrasi yang dapat diulang dari Pengaturan.
+Target dan transfer tabungan tersimpan di Supabase bersama transaksi dan dompet. Penyimpanan baru menampilkan hasil setelah RPC berhasil; RLS membatasi setiap akun pada datanya sendiri.
 
 Saldo awal dompet mengikuti Pengaturan, dengan bawaan contoh yang didokumentasikan di atas. Uang Aman Dipakai kini mengurangi dana tabungan aktual, termasuk target arsip dan saldo Tabungan lama; belum memperhitungkan tagihan. Riwayat transfer ada di menu Tabungan, sedangkan Riwayat transaksi tetap khusus pemasukan/pengeluaran. Tes fitur: test/unit/savings.test.ts dan test/e2e/savings.spec.ts.
 
@@ -124,7 +124,7 @@ Data Riwayat berasal dari Supabase sehingga dapat dilihat lintas perangkat setel
 
 ## Pengaturan
 
-Menu /pengaturan tersedia dari navigasi HP dan desktop. Profil menampilkan email dan memungkinkan perubahan nama panggilan melalui Supabase Auth; metadata ini hanya untuk tampilan, bukan otorisasi. Keluar Akun memakai scope local, mengakhiri sesi browser ini tanpa menghapus data keuangan atau mengeluarkan perangkat lain. Perubahan profil memerlukan koneksi.
+Menu /pengaturan tersedia dengan label Pengaturan dari navigasi HP dan desktop. Profil menampilkan email dan memungkinkan perubahan nama panggilan melalui Supabase Auth; metadata ini hanya untuk tampilan, bukan otorisasi. Tombol Keluar Akun berada di popup profil yang dibuka melalui avatar atau Edit Profil. Keluar memerlukan konfirmasi dan memakai scope local, mengakhiri sesi browser ini tanpa menghapus data keuangan atau mengeluarkan perangkat lain. Isian profil yang belum disimpan dipertahankan jika keluar dibatalkan. Jika Supabase sudah membersihkan sesi lokal meskipun endpoint logout gagal, aplikasi tetap kembali ke halaman login. Perubahan profil memerlukan koneksi.
 
 Dompet Tunai, Bank, dan E-Wallet memiliki saldo awal yang dapat diatur dalam rupiah bulat nonnegatif. Saldo awal bukan pemasukan. Semua pemeriksaan catatan (termasuk edit/hapus/Urungkan), anggaran, transfer tabungan, dan ringkasan dashboard memakai saldo tersebut. Perubahan yang menyebabkan saldo tersedia negatif ditolak. Dompet yang masih bersaldo atau terhubung ke anggaran tidak dapat dinonaktifkan; riwayat dompet kosong tetap disimpan. Pilihan Tabungan lama mengatur ketersediaan dompet tersebut untuk catatan, terpisah dari dana target yang tetap terlindungi.
 
@@ -134,7 +134,7 @@ Kategori tambahan dapat dibuat, diubah nama/ikon, diarsipkan, dan diaktifkan kem
 
 Backup JSON maksimal 15 MB memuat catatan beserta struk, anggaran, kategori, target dan transfer tabungan, serta pengaturan. Backup tidak mencakup kata sandi, token sesi, cookie, atau profil Auth. Impor hanya menerima versi yang didukung dan akun yang sama, memeriksa struktur, relasi kategori/target, tanggal, dan konsistensi saldo sebelum meminta konfirmasi penggantian. Preview yang sudah kedaluwarsa akibat perubahan data ditolak. Reset memerlukan mengetik RESET, mengosongkan data keuangan akun aktif dan mengatur saldo awal nol; akun lain serta sesi masuk tetap ada.
 
-Backup lama tetap dapat dibaca untuk migrasi. Backup dan reset sekarang menggunakan snapshot Supabase atomik melalui RPC; preview restore memeriksa fingerprint data cloud sebelum penggantian. Data localStorage lama dipertahankan sampai pengguna memindahkannya secara sadar.
+Backup lama yang kompatibel tetap dapat dipulihkan melalui Pilih Backup. Backup dan reset menggunakan snapshot Supabase atomik melalui RPC; preview restore memeriksa fingerprint data cloud sebelum penggantian.
 
 Pengaturan keuangan, tema, saldo awal, dan status dompet tersimpan di Supabase dan tersedia lintas perangkat. Backup JSON tetap berguna sebagai salinan portabel; data browser lama tidak dihapus otomatis. Pengujian tersedia pada test/unit/settings.test.ts dan test/e2e/settings.spec.ts; autentikasi browser ditirukan tanpa mengubah akun nyata.
 

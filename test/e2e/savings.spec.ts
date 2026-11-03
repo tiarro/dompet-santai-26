@@ -1,4 +1,5 @@
 import { mockFinanceApi } from './cloud-fixture'
+import { expectExplicitDismissal } from './dialog-fixture'
 import { expect, test, type Page } from '@playwright/test'
 const userId = '00000000-0000-4000-8000-000000000123'
 const notesKey = 'dompet-santai-notes-v1:' + userId
@@ -223,7 +224,9 @@ test('savings targets persist per account, support mobile themes, editing and re
   await page.getByRole('button', { name: 'Ubah Target', exact: true }).click()
   editor = page.getByRole('dialog', { name: 'Ubah Target', exact: true })
   await editor.getByLabel('Nama target').fill('Draft belum disimpan')
-  await page.keyboard.press('Escape')
+  await expectExplicitDismissal(page, editor)
+  await expect(editor.getByText('Isian belum disimpan. Tutup dan buang isian?')).not.toBeVisible()
+  await editor.getByRole('button', { name: 'Tutup form tabungan' }).click()
   await expect(editor.getByRole('alert')).toContainText('Isian belum disimpan')
   await editor.getByRole('button', { name: 'Buang isian' }).click()
   await page.reload()

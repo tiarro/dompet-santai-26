@@ -2,7 +2,6 @@
 import { noteAccounts } from '~/utils/notes'
 import { validateDocuments, type FinanceBackup } from '~/utils/backup'
 const user = useSupabaseUser()
-const supabase = useSupabaseClient()
 const emit = defineEmits<{ 'edit-profile': [] }>()
 const { data, ready, error, refresh, save, backup, prepareRestore, resetFingerprint, replace } = useSettings()
 const draft = ref(JSON.parse(JSON.stringify(data.value)))
@@ -13,15 +12,14 @@ const formError = ref('')
 const busy = ref(false)
 const hasDraft = dirty
 const confirmDialog = ref<HTMLDialogElement | null>(null)
-const confirmation = ref<'restore' | 'reset' | 'logout'>('reset')
+const confirmation = ref<'restore' | 'reset'>('reset')
 const pendingBackup = shallowRef<FinanceBackup | null>(null)
 const fingerprint = ref('')
 const confirmText = ref('')
 const fileInput = ref<HTMLInputElement | null>(null)
 const fileName = ref('')
 const backupSummary = computed(() => pendingBackup.value ? validateDocuments(pendingBackup.value.documents) : null)
-const title = computed(() => confirmation.value === 'restore' ? 'Pulihkan backup' : confirmation.value === 'reset' ? 'Reset data keuangan' : 'Keluar akun')
-let allowLeave = false
+const title = computed(() => confirmation.value === 'restore' ? 'Pulihkan backup' : 'Reset data keuangan')
 function loadDraft() {
   draft.value = JSON.parse(JSON.stringify(data.value))
   initial.value = JSON.stringify(draft.value)
@@ -65,7 +63,7 @@ async function chooseBackup(event: Event) {
   })
   if (fileInput.value) fileInput.value.value = ''
 }
-function openConfirmation(kind: 'reset' | 'logout') {
+function openConfirmation(kind: 'reset') {
   formError.value = ''
   if (hasDraft.value) { formError.value = 'Simpan atau batalkan isian sebelum melanjutkan.'; return }
   try {
@@ -77,14 +75,6 @@ function openConfirmation(kind: 'reset' | 'logout') {
 function confirmAction() {
   if (confirmation.value === 'reset' && confirmText.value !== 'RESET') return
   return run(async () => {
-    if (confirmation.value === 'logout') {
-      const { error: logoutError } = await supabase.auth.signOut({ scope: 'local' })
-      if (logoutError) throw new Error('Belum berhasil keluar. Periksa koneksi lalu coba lagi.')
-      allowLeave = true
-      confirmDialog.value?.close()
-      await navigateTo('/login')
-      return
-    }
     await replace(confirmation.value === 'restore' ? pendingBackup.value : null, fingerprint.value)
     loadDraft()
     notice.value = confirmation.value === 'restore' ? 'Backup berhasil dipulihkan.' : 'Data keuangan akun ini sudah direset. Saldo awal menjadi nol.'
@@ -93,7 +83,7 @@ function confirmAction() {
   })
 }
 function beforeUnload(event: BeforeUnloadEvent) { if (hasDraft.value) { event.preventDefault(); event.returnValue = '' } }
-onBeforeRouteLeave(() => allowLeave || !hasDraft.value || window.confirm('Ada isian pengaturan yang belum disimpan. Tinggalkan halaman?'))
+onBeforeRouteLeave(() => !user.value || !hasDraft.value || window.confirm('Ada isian pengaturan yang belum disimpan. Tinggalkan halaman?'))
 onMounted(() => window.addEventListener('beforeunload', beforeUnload))
 onBeforeUnmount(() => { window.removeEventListener('beforeunload', beforeUnload); confirmDialog.value?.close() })
 </script>
@@ -109,7 +99,7 @@ onBeforeUnmount(() => { window.removeEventListener('beforeunload', beforeUnload)
     <section id="profil" class="settings-card">
       <div class="section-heading"><span class="material-symbols-outlined" aria-hidden="true">person</span><div><h3>Profil dan akun</h3><p>Atur nama, bio, dan gender melalui panel profil.</p></div></div>
       <label>Email<input :value="user?.email ?? ''" readonly type="email"></label>
-      <div class="actions"><button type="button" class="primary" :disabled="busy" @click="emit('edit-profile')">Edit Profil</button><button type="button" class="danger" :disabled="busy" @click="openConfirmation('logout')">Keluar Akun</button></div>
+      <div class="actions"><button type="button" class="primary" :disabled="busy" @click="emit('edit-profile')">Edit Profil</button></div>
     </section>
 
     <form class="settings-form" @submit.prevent="saveSettings">
@@ -129,21 +119,18 @@ onBeforeUnmount(() => { window.removeEventListener('beforeunload', beforeUnload)
       </fieldset>
     </form>
 
-    <CloudMigrationCard />
-
     <section id="data" class="settings-card">
-      <div class="section-heading"><span class="material-symbols-outlined" aria-hidden="true">backup</span><div><h3>Data dan penyimpanan</h3><p>Backup lokal tetap tersedia; data utama tersimpan di Supabase.</p></div></div>
+      <div class="section-heading"><span class="material-symbols-outlined" aria-hidden="true">backup</span><div><h3>Data dan penyimpanan</h3><p>Data tersimpan otomatis di akun Anda dan dapat diakses dari perangkat lain.</p></div></div>
       <p class="hint">Backup memuat catatan dan struk, anggaran, kategori, tabungan, serta pengaturan. Pemulihan hanya untuk akun yang sama dan mengganti data keuangan yang tersimpan. Profil dan sesi masuk tidak disertakan.</p>
       <div class="actions"><button class="primary" :disabled="busy || !ready" @click="downloadBackup">Unduh Backup</button><label class="secondary file-button">Pilih Backup<input ref="fileInput" type="file" accept=".json,application/json" aria-label="Pilih file backup" :disabled="busy" @change="chooseBackup"></label><button class="danger" :disabled="busy" @click="openConfirmation('reset')">Reset Data Keuangan</button></div>
-      <p class="hint">Supabase menjadi sumber data utama setelah migrasi. Unduh backup secara berkala sebagai cadangan. Reset mengosongkan data keuangan akun ini dan mengatur saldo awal menjadi nol. Pengingat tagihan disimpan terpisah dan tidak termasuk backup, pemulihan, atau reset ini. Catatan yang menunggu sinkronisasi juga tersimpan terpisah di perangkat; selesaikan atau hapus antreannya sebelum memulihkan atau mereset data.</p>
+      <p class="hint">Unduh backup secara berkala sebagai cadangan. Reset mengosongkan data keuangan akun ini dan mengatur saldo awal menjadi nol. Pengingat tagihan disimpan terpisah dan tidak termasuk backup, pemulihan, atau reset ini. Catatan yang menunggu sinkronisasi juga tersimpan terpisah di perangkat; selesaikan atau hapus antreannya sebelum memulihkan atau mereset data.</p>
     </section>
-    <dialog ref="confirmDialog" :aria-label="title" class="settings-dialog" @cancel="busy && $event.preventDefault()">
+    <dialog ref="confirmDialog" :aria-label="title" class="settings-dialog" @cancel.stop.prevent>
       <h3>{{ title }}</h3>
       <template v-if="confirmation === 'restore'"><p>Ganti data keuangan akun ini dengan <strong>{{ fileName }}</strong>?</p><p v-if="backupSummary">{{ backupSummary.notes.length }} catatan · {{ backupSummary.budgets.length }} anggaran · {{ backupSummary.savings.goals.filter(goal => !goal.deleted).length }} target tabungan</p><p>Data yang ada akan diganti. Unduh backup saat ini sebelum melanjutkan.</p></template>
       <template v-else-if="confirmation === 'reset'"><p>Seluruh catatan, struk, anggaran, kategori tambahan, target tabungan, dan pengaturan keuangan akun ini akan dikosongkan. Akun tetap ada.</p><label>Ketik RESET untuk melanjutkan<input v-model="confirmText" autocomplete="off"></label></template>
-      <p v-else>Keluar dari akun? Data keuangan tetap tersimpan untuk akunmu.</p>
       <p v-if="formError" class="error" role="alert">{{ formError }}</p>
-      <div class="actions"><button class="secondary" :disabled="busy" @click="confirmDialog?.close()">Batal</button><button class="primary" :disabled="busy || (confirmation === 'reset' && confirmText !== 'RESET')" @click="confirmAction">{{ busy ? 'Memproses...' : confirmation === 'restore' ? 'Ya, Pulihkan Backup' : confirmation === 'reset' ? 'Ya, Reset Data' : 'Ya, Keluar Akun' }}</button></div>
+      <div class="actions"><button class="secondary" :disabled="busy" @click="confirmDialog?.close()">Batal</button><button class="primary" :disabled="busy || (confirmation === 'reset' && confirmText !== 'RESET')" @click="confirmAction">{{ busy ? 'Memproses...' : confirmation === 'restore' ? 'Ya, Pulihkan Backup' : 'Ya, Reset Data' }}</button></div>
     </dialog>
   </section>
 </template>

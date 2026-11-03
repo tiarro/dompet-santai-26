@@ -21,6 +21,8 @@ const error = ref('')
 const notice = ref('')
 const discarding = ref(false)
 const opened = ref(false)
+const confirmingLogout = ref(false)
+const logoutError = ref('')
 const genders = [
   { value: '', label: 'Tidak ingin menyebutkan' },
   { value: 'female', label: 'Perempuan' },
@@ -36,6 +38,7 @@ function open() {
   draft.gender = genders.some(item => item.value === metadata?.gender) ? metadata!.gender : ''
   initial.value = JSON.stringify(draft)
   error.value = ''; notice.value = ''; discarding.value = false
+  confirmingLogout.value = false; logoutError.value = ''
   pendingPhoto.value = null; photoError.value = ''; processingPhoto.value = false
   previousOverflow = document.body.style.overflow
   document.body.style.overflow = 'hidden'
@@ -53,8 +56,33 @@ function close() {
 }
 function requestClose() {
   if (busy.value || processingPhoto.value) return
+  confirmingLogout.value = false
   if (dirty.value) { discarding.value = true; return }
   close()
+}
+function requestLogout() {
+  if (busy.value || processingPhoto.value || discarding.value) return
+  confirmingLogout.value = true
+  logoutError.value = ''
+  nextTick(() => {
+    content.value?.querySelector('.logout-confirmation')?.scrollIntoView({ block: 'nearest' })
+    content.value?.querySelector<HTMLButtonElement>('.logout-cancel')?.focus({ preventScroll: true })
+  })
+}
+async function logout() {
+  if (busy.value || processingPhoto.value || !confirmingLogout.value) return
+  busy.value = true
+  logoutError.value = ''
+  try {
+    const { error: failure } = await supabase.auth.signOut({ scope: 'local' })
+    // Supabase can clear the local session even when the logout endpoint fails.
+    // Once cleared, finish navigating instead of leaving a signed-out panel open.
+    if (failure && session.value?.access_token) throw failure
+    close()
+    await navigateTo('/login')
+  } catch {
+    logoutError.value = 'Belum berhasil keluar. Periksa koneksi lalu coba lagi.'
+  } finally { busy.value = false }
 }
 async function choosePhoto(event: Event) {
   const input = event.target as HTMLInputElement
@@ -111,7 +139,7 @@ defineExpose({ open })
 </script>
 
 <template>
-  <dialog ref="dialog" class="profile-dialog" aria-labelledby="profile-dialog-title" @cancel.prevent="requestClose" @click="$event.target === dialog && requestClose()">
+  <dialog ref="dialog" class="profile-dialog" aria-labelledby="profile-dialog-title" @cancel.stop.prevent>
     <header class="profile-header">
       <h2 id="profile-dialog-title">Edit profil</h2>
       <button type="button" class="close-button" aria-label="Tutup edit profil" :disabled="busy || processingPhoto" @click="requestClose"><span class="material-symbols-outlined" aria-hidden="true">close</span></button>
@@ -119,8 +147,8 @@ defineExpose({ open })
     <div ref="content" class="profile-content">
       <div class="profile-photo">
         <img :src="pendingPhoto?.preview || image" :alt="pendingPhoto ? 'Pratinjau foto profil' : 'Foto profil'" width="80" height="80">
-        <input ref="photoInput" class="photo-input" type="file" :accept="profilePhotoAccept" aria-label="Pilih foto profil" :disabled="busy || processingPhoto || discarding" @change="choosePhoto">
-        <div class="photo-actions"><button type="button" class="photo-button" :disabled="busy || processingPhoto || discarding" @click="photoInput?.click()">{{ processingPhoto ? 'Memproses foto...' : 'Ubah foto' }}</button><button v-if="pendingPhoto" type="button" class="photo-button" :disabled="busy || processingPhoto || discarding" @click="pendingPhoto = null; photoError = ''">Batalkan foto</button></div>
+        <input ref="photoInput" class="photo-input" type="file" :accept="profilePhotoAccept" aria-label="Pilih foto profil" :disabled="busy || processingPhoto || discarding || confirmingLogout" @change="choosePhoto">
+        <div class="photo-actions"><button type="button" class="photo-button" :disabled="busy || processingPhoto || discarding || confirmingLogout" @click="photoInput?.click()">{{ processingPhoto ? 'Memproses foto...' : 'Ubah foto' }}</button><button v-if="pendingPhoto" type="button" class="photo-button" :disabled="busy || processingPhoto || discarding || confirmingLogout" @click="pendingPhoto = null; photoError = ''">Batalkan foto</button></div>
         <small>JPG, PNG, atau WebP, maksimal 10 MB.<br>Foto dipotong persegi otomatis.</small>
         <p v-if="photoError" class="message error" role="alert">{{ photoError }}</p>
         <div v-if="profile?.email" class="profile-email">
@@ -129,7 +157,7 @@ defineExpose({ open })
         </div>
       </div>
       <form @submit.prevent="save">
-        <fieldset :disabled="busy || processingPhoto || discarding">
+        <fieldset :disabled="busy || processingPhoto || discarding || confirmingLogout">
           <label for="profile-name">Nama</label>
           <input id="profile-name" v-model="draft.name" type="text" autocomplete="nickname" maxlength="40" placeholder="Nama panggilanmu">
           <div class="label-row"><label for="profile-bio">Bio</label><span id="profile-bio-count">{{ draft.bio.length }}/150</span></div>
@@ -146,6 +174,15 @@ defineExpose({ open })
         <p>Buang perubahan profil yang belum disimpan?</p>
         <div><button type="button" class="keep-button" @click="discarding = false">Lanjut edit</button><button type="button" class="discard-button" @click="close">Buang perubahan</button></div>
       </div>
+      <section class="profile-logout" aria-label="Keluar akun">
+        <div v-if="confirmingLogout" class="logout-confirmation">
+          <p>Keluar dari akun? Data keuangan tetap tersimpan untuk akunmu.</p>
+          <p v-if="dirty">Perubahan profil yang belum disimpan akan dibuang jika Anda keluar.</p>
+          <p v-if="logoutError" class="message error" role="alert">{{ logoutError }}</p>
+          <div class="logout-actions"><button type="button" class="logout-cancel" :disabled="busy" @click="confirmingLogout = false; logoutError = ''">Batal</button><button type="button" class="logout-button" :disabled="busy" @click="logout">{{ busy ? 'Keluar...' : 'Ya, Keluar Akun' }}</button></div>
+        </div>
+        <button v-else type="button" class="logout-button" :disabled="busy || processingPhoto || discarding" @click="requestLogout"><span class="material-symbols-outlined" aria-hidden="true">logout</span>Keluar Akun</button>
+      </section>
     </div>
   </dialog>
 </template>
@@ -189,6 +226,10 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 .discard-prompt > div { display: flex; flex-wrap: wrap; gap: .5rem; }
 .discard-prompt button { flex: 1; min-height: 44px; padding: .5rem; border: 1px solid var(--line); border-radius: .6rem; background: var(--surface); font-weight: 700; }
 .keep-button { color: var(--ink); }.discard-button { color: var(--danger); }
+.profile-logout { border-top: 1px solid var(--line); margin-top: 1.5rem; padding-top: 1.25rem; }
+.logout-button,.logout-cancel { display: inline-flex; justify-content: center; align-items: center; gap: .5rem; width: 100%; min-height: 48px; padding: .65rem 1rem; border: 1px solid var(--line); border-radius: .8rem; background: var(--surface); font-weight: 700; }
+.logout-button { color: var(--danger); }.logout-cancel { color: var(--ink); }
+.logout-confirmation { font-size: .85rem; line-height: 1.6; }.logout-actions { display: flex; gap: .5rem; }
 button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 3px solid var(--teal); outline-offset: 3px; }
 @keyframes profile-enter { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 @media (max-width: 600px) { .profile-dialog { box-sizing: border-box; width: 100%; max-width: 100%; margin: auto 0 0; max-height: 92dvh; border-radius: 1.5rem 1.5rem 0 0; border-bottom: 0; }.profile-content { padding-bottom: max(1.5rem, env(safe-area-inset-bottom)); } }

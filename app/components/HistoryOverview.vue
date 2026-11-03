@@ -169,7 +169,7 @@ defineExpose({ afterUpdate, close: () => closeDetail(false) })
       </template>
       <div v-else class="history-empty"><span class="material-symbols-outlined" aria-hidden="true">{{ notes.length ? 'search_off' : 'history' }}</span><h3>{{ notes.length ? 'Tidak ada transaksi yang cocok' : 'Belum ada riwayat' }}</h3><p>{{ notes.length ? 'Coba periode lain atau reset filter untuk melihat catatanmu.' : 'Mulai dari satu catatan pemasukan atau pengeluaran.' }}</p><button v-if="notes.length" class="secondary" @click="resetFilters">Reset Filter</button><button v-else class="primary" @click="emit('add')">Tambah Catatan</button></div>
     </template>
-    <dialog ref="detailDialog" class="history-detail" aria-label="Detail Transaksi" @cancel.prevent="closeDetail()">
+    <dialog ref="detailDialog" class="history-detail" aria-label="Detail Transaksi" @cancel.stop.prevent>
       <template v-if="detail">
         <header class="detail-header"><h2>Detail Transaksi</h2><button class="icon-button" aria-label="Tutup detail transaksi" autofocus @click="closeDetail()"><span class="material-symbols-outlined" aria-hidden="true">close</span></button></header>
         <p class="detail-kind">{{ detail.type === 'income' ? 'Pemasukan' : 'Pengeluaran' }}</p>

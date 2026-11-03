@@ -24,11 +24,6 @@ function close() {
   }
   receipt.value = undefined
 }
-function backdropClick(event: MouseEvent) {
-  if (event.target !== dialog.value || !dialog.value) return
-  const bounds = dialog.value.getBoundingClientRect()
-  if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) close()
-}
 function trapFocus(event: KeyboardEvent) {
   event.stopPropagation()
   if (event.key !== 'Tab') return
@@ -48,7 +43,7 @@ defineExpose({ open, close })
 </script>
 
 <template>
-  <dialog ref="dialog" class="receipt-viewer" aria-label="Foto struk" @keydown="trapFocus" @cancel.stop.prevent="close" @click="backdropClick">
+  <dialog ref="dialog" class="receipt-viewer" aria-label="Foto struk" @keydown="trapFocus" @cancel.stop.prevent>
     <template v-if="receipt">
       <header>
         <div><h2>Foto struk</h2><p>{{ receipt.name }}</p></div>

@@ -1,15 +1,10 @@
-import { defaultCategories, categoryCatalog, type CustomCategory } from '~/utils/categories'
+import { defaultCategories, type CustomCategory } from '~/utils/categories'
 import { defaultSettings, type AppSettings } from '~/utils/settings'
 import { noteAccounts, type MoneyNote } from '~/utils/notes'
 import { emptySavings, type SavingsState } from '~/utils/savings'
-import { readFinancialDocuments } from '~/utils/financialStorage'
-import { readNotes } from '~/utils/notes'
-import { readBudgets, type MonthlyBudget } from '~/utils/budgets'
-import { readCategories } from '~/utils/categories'
-import { readSavings } from '~/utils/savings'
+import type { MonthlyBudget } from '~/utils/budgets'
 import type { Database, Json } from '#shared/types/database'
-import { validateDocuments } from '~/utils/backup'
-import { snapshotIsEmpty, snapshotFingerprint } from '~/utils/cloudSnapshot'
+import { snapshotFingerprint } from '~/utils/cloudSnapshot'
 
 export interface CloudProfile {
   username: string
@@ -38,7 +33,6 @@ interface CloudState {
   error: string
   data: CloudFinanceData
   fingerprint: string
-  snapshotEmpty: boolean
 }
 
 const defaultProfile = (): CloudProfile => ({
@@ -86,12 +80,6 @@ function blobToDataUrl(blob: Blob): Promise<string> {
   })
 }
 
-function fingerprint(value: unknown) {
-  let hash = 2166136261
-  for (const byte of new TextEncoder().encode(JSON.stringify(value))) hash = Math.imul(hash ^ byte, 16777619)
-  return 'fnv1a-' + (hash >>> 0).toString(16).padStart(8, '0')
-}
-
 function accountDefaults(data: SnapshotWire) {
   const balances = Object.fromEntries(noteAccounts.map(account => [account.id, 0]))
   const active = new Set<string>()
@@ -108,7 +96,7 @@ export function useCloudFinance() {
   const supabase = useSupabaseClient<Database>()
   const user = useSupabaseUser()
   const state = useState<CloudState>('dompet-santai-cloud-finance', () => ({
-    owner: '', ready: false, loading: false, error: '', fingerprint: '', snapshotEmpty: true, data: emptyCloudData(),
+    owner: '', ready: false, loading: false, error: '', fingerprint: '', data: emptyCloudData(),
   }))
   const online = useState('dompet-santai-online', () => true)
   // Supabase's claims state normally exposes `sub`, while mocked or older
@@ -275,7 +263,7 @@ export function useCloudFinance() {
     }
   }
 
-  async function save(next: CloudFinanceData, migration?: { source_fingerprint: string; counts: Record<string, number> }, guard?: { owner: string; fingerprint: string }) {
+  async function save(next: CloudFinanceData, guard?: { owner: string; fingerprint: string }) {
     const id = owner.value
     if (guard && (guard.owner !== id || guard.fingerprint !== state.value.fingerprint)) throw Object.assign(new Error('Data atau akun berubah. Coba sinkronkan kembali.'), { code: '40001' })
     if (!id) throw new Error('Silakan masuk kembali.')
@@ -290,7 +278,7 @@ export function useCloudFinance() {
       // Freeze the proposal before asynchronous uploads or refreshes can change it.
       const prepared = await payloadFor(JSON.parse(JSON.stringify(next)), id)
       if (owner.value !== id) throw new Error('Akun berubah. Silakan masuk kembali.')
-      const payload = { ...prepared.payload, _meta: { expected_fingerprint: expected, require_empty: !!migration, migration: migration ?? null } }
+      const payload = { ...prepared.payload, _meta: { expected_fingerprint: expected } }
       const { data: result, error } = await supabase.rpc('replace_finance_snapshot', { payload: payload as Json })
       if (error) {
         // Only explicit database rejection proves the uploaded files are unreferenced.
@@ -300,15 +288,13 @@ export function useCloudFinance() {
         }
         const message = error.code === '40001'
           ? 'Data cloud berubah di perangkat lain. Muat ulang data sebelum mencoba lagi.'
-          : error.code === '23505' && migration
-            ? 'Data cloud sudah berisi data. Migrasi dibatalkan agar data cloud tidak tertimpa.'
-            : error.message || 'Data belum tersimpan ke Supabase. Muat ulang sebelum mencoba lagi.'
+          : error.message || 'Data belum tersimpan ke Supabase. Muat ulang sebelum mencoba lagi.'
         if (owner.value === id) state.value.error = message
         throw Object.assign(new Error(message), { code: error.code })
       }
       const mapped = await mapSnapshot(result)
       if (owner.value === id && version === requestVersion.value) {
-        state.value = { owner: id, ready: true, loading: false, error: '', fingerprint: snapshotFingerprint(result), snapshotEmpty: snapshotIsEmpty(result), data: mapped }
+        state.value = { owner: id, ready: true, loading: false, error: '', fingerprint: snapshotFingerprint(result), data: mapped }
       }
       // Retain previously committed receipt objects: another tab or a backup may
       // still reference them. Cleanup belongs in a server-side retention job.
@@ -319,7 +305,7 @@ export function useCloudFinance() {
 
   function clear() {
     ++requestVersion.value
-    state.value = { owner: '', ready: false, loading: false, error: '', fingerprint: '', snapshotEmpty: true, data: emptyCloudData() }
+    state.value = { owner: '', ready: false, loading: false, error: '', fingerprint: '', data: emptyCloudData() }
   }
 
   async function refresh() {
@@ -337,47 +323,12 @@ export function useCloudFinance() {
       if (error) throw new Error(error.message || 'Data Supabase belum bisa dimuat.')
       const mapped = await mapSnapshot(result)
       if (owner.value !== id || version !== requestVersion.value) return
-      // Reading an empty cloud never seeds it; local migration must remain possible.
-      state.value = { owner: id, ready: true, loading: false, error: '', fingerprint: snapshotFingerprint(result), snapshotEmpty: snapshotIsEmpty(result), data: mapped }
+      state.value = { owner: id, ready: true, loading: false, error: '', fingerprint: snapshotFingerprint(result), data: mapped }
     } catch (reason) {
       if (owner.value === id && version === requestVersion.value) {
         state.value = { ...state.value, loading: false, error: reason instanceof Error ? reason.message : 'Data Supabase belum bisa dimuat.' }
       }
     }
-  }
-
-  function localMigrationPreview() {
-    const id = owner.value
-    if (!id) throw new Error('Silakan masuk kembali.')
-    const documents = readFinancialDocuments(id)
-    const customCategories = readCategories(documents.categories)
-    const catalog = categoryCatalog(customCategories)
-    const notes = readNotes(documents.notes, catalog)
-    const budgets = readBudgets(documents.budgets, catalog)
-    const savings = readSavings(documents.savings)
-    return {
-      notes: notes.length,
-      receipts: notes.filter(note => !!note.receipt).length,
-      budgets: budgets.length,
-      categories: customCategories.length,
-      goals: savings.goals.length,
-      movements: savings.movements.length,
-    }
-  }
-  async function migrateLocal() {
-    const id = owner.value
-    if (!id) throw new Error('Silakan masuk kembali.')
-    if (!online.value) throw new Error('Hubungkan internet sebelum memulai migrasi.')
-    await refresh()
-    if (state.value.error) throw new Error(state.value.error)
-    if (!state.value.snapshotEmpty) throw new Error('Data cloud sudah berisi data. Migrasi browser dibatalkan agar data cloud tidak tertimpa.')
-    const documents = readFinancialDocuments(id)
-    const parsed = validateDocuments(documents)
-    const migrated: CloudFinanceData = { ...state.value.data, customCategories: parsed.categories, notes: parsed.notes, budgets: parsed.budgets, savings: parsed.savings, settings: parsed.settings }
-    const counts = { notes: parsed.notes.length, receipts: parsed.notes.filter(note => !!note.receipt).length, budgets: parsed.budgets.length, categories: parsed.categories.length, goals: parsed.savings.goals.length, movements: parsed.savings.movements.length }
-    // The server records completion atomically with the empty-cloud check and write.
-    await save(migrated, { source_fingerprint: await fingerprint(documents), counts })
-    return counts
   }
 
   async function saveOnboarding(input: { username: string; goal: string; payday: string; balance: number; accounts: string[] }) {
@@ -403,11 +354,8 @@ export function useCloudFinance() {
     saving,
     fingerprint: computed(() => state.value.fingerprint),
     clear,
-    cloudEmpty: computed(() => state.value.snapshotEmpty),
     refresh,
     save,
-    migrateLocal,
-    localMigrationPreview,
     saveOnboarding,
   }
 }

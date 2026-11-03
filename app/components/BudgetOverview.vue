@@ -181,7 +181,7 @@ onBeforeUnmount(closeEditor)
         </section>
       </template>
     </template>
-    <dialog ref="editor" class="budget-editor" :aria-label="mode === 'create' ? 'Buat Anggaran' : 'Ubah Anggaran'" @cancel.prevent="requestClose">
+    <dialog ref="editor" class="budget-editor" :aria-label="mode === 'create' ? 'Buat Anggaran' : 'Ubah Anggaran'" @cancel.stop.prevent>
       <header class="section-title"><h2 id="budget-editor-title">{{ mode === 'create' ? 'Buat Anggaran' : 'Ubah Anggaran' }}</h2><button class="close-button" aria-label="Tutup form anggaran" @click="requestClose"><span class="material-symbols-outlined" aria-hidden="true">close</span></button></header>
       <p class="muted">Tentukan batas yang nyaman untuk satu kategori.</p>
       <form novalidate @submit.prevent="submit">

@@ -80,7 +80,7 @@ export function usePendingNotes() {
           }
           const prepared = await update(row => ({ ...row, attemptedFingerprint: currentFingerprint, error: '' }))
           if (!prepared || owner.value !== id) break
-          await cloud.save({ ...cloud.data.value, notes: [...cloud.data.value.notes, claimed.note] }, undefined, { owner: id, fingerprint: currentFingerprint })
+          await cloud.save({ ...cloud.data.value, notes: [...cloud.data.value.notes, claimed.note] }, { owner: id, fingerprint: currentFingerprint })
           if (owner.value === id && cloud.data.value.notes.some(note => note.id === claimed.note.id)) await update(() => null)
         } catch (reason) {
           const failure = reason as Error & { code?: string }

@@ -1,4 +1,5 @@
 import { mockFinanceApi } from './cloud-fixture'
+import { expectExplicitDismissal } from './dialog-fixture'
 import { expect, test, type Page } from '@playwright/test'
 
 test.use({ launchOptions: { args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] } })
@@ -137,9 +138,11 @@ test('history detail keeps filters and receipts while edit replaces the transact
   await openHistory(page)
   await page.getByLabel('Cari transaksi').fill('Makan')
   const detail = await detailFor(page, 'Makan siang')
+  await expectExplicitDismissal(page, detail)
   await detail.getByRole('button', { name: 'Lihat struk' }).click()
   const viewer = page.getByRole('dialog', { name: 'Foto struk', exact: true })
   await expect(viewer.getByAltText('Foto struk tersimpan')).toHaveJSProperty('naturalWidth', 200)
+  await expectExplicitDismissal(page, viewer)
   await viewer.getByRole('button', { name: 'Tutup foto struk' }).click()
   await detail.getByRole('button', { name: 'Ubah Catatan', exact: true }).click()
   const editor = page.getByRole('dialog', { name: 'Ubah Catatan', exact: true })

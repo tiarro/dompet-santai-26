@@ -39,7 +39,7 @@ defineExpose({ open, close })
 </script>
 
 <template>
-  <dialog ref="dialog" class="notification-panel" aria-labelledby="notification-title" @cancel.prevent="close" @close="close" @click="event => { if (event.target === dialog) close() }">
+  <dialog ref="dialog" class="notification-panel" aria-labelledby="notification-title" @cancel.stop.prevent @close="close">
     <header class="notification-header">
       <div class="notification-heading"><span class="notification-emblem material-symbols-outlined" aria-hidden="true">notifications_active</span><div><p class="eyebrow">RUANG PENGINGATMU</p><h2 id="notification-title">Notifikasi <span class="heading-count">{{ items.length }}</span></h2></div><button class="close-button" type="button" aria-label="Tutup notifikasi" autofocus @click="close"><span class="material-symbols-outlined" aria-hidden="true">close</span></button></div>
       <p class="notification-subtitle">Hal kecil hari ini, keuangan lebih tenang esok.</p>

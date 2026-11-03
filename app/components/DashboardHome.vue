@@ -33,9 +33,9 @@ function navigateMenu(label: string) {
   if (label === 'Anggaran') navigateTo('/anggaran');
   if (label === 'Riwayat') navigateTo('/riwayat');
   if (label === 'Tabungan') navigateTo('/tabungan');
-  if (label === 'Setting' || label === 'Pengaturan') navigateTo('/pengaturan');
+  if (label === 'Pengaturan') navigateTo('/pengaturan');
 }
-function menuActive(label: string) { return (label === 'Setting' ? 'Pengaturan' : label) === (settingsPage.value ? 'Pengaturan' : savingsPage.value ? 'Tabungan' : historyPage.value ? 'Riwayat' : budgetPage.value ? 'Anggaran' : 'Beranda'); }
+function menuActive(label: string) { return label === (settingsPage.value ? 'Pengaturan' : savingsPage.value ? 'Tabungan' : historyPage.value ? 'Riwayat' : budgetPage.value ? 'Anggaran' : 'Beranda'); }
 
 const defaultProfileImage = '/avatar-default.svg';
 
@@ -168,7 +168,7 @@ const navigation = [
   { label: "Riwayat", icon: "history" },
   { label: "Anggaran", icon: "account_balance_wallet" },
   { label: "Tabungan", icon: "savings" },
-  { label: "Setting", icon: "settings" },
+  { label: "Pengaturan", icon: "settings" },
 ];
 
 const desktopNavigation = [

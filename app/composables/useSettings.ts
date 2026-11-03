@@ -75,11 +75,8 @@ export function useSettings() {
   }
 
   return {
-    data, ready, error, refresh: cloud.refresh, cloudEmpty: cloud.cloudEmpty,
+    data, ready, error, refresh: cloud.refresh,
     save, backup, prepareRestore, resetFingerprint, replace,
-    migrateLocal: cloud.migrateLocal,
-    localMigrationPreview: cloud.localMigrationPreview,
-    migrationOnline: cloud.online,
   }
 }
 

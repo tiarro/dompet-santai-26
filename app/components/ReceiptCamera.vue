@@ -167,7 +167,7 @@ defineExpose({ open, close })
 </script>
 
 <template>
-  <dialog ref="dialog" class="receipt-camera" aria-label="Kamera struk" @keydown="handleKeys" @cancel.stop.prevent="close">
+  <dialog ref="dialog" class="receipt-camera" aria-label="Kamera struk" @keydown="handleKeys" @cancel.stop.prevent>
     <header>
       <div><h2>Ambil foto struk</h2><p>Posisikan seluruh struk agar terlihat jelas.</p></div>
       <button type="button" class="camera-close" aria-label="Tutup kamera" autofocus @click="close"><span class="material-symbols-outlined" aria-hidden="true">close</span></button>
