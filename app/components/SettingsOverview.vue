@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PushReminderSettings from './PushReminderSettings.vue'
 import { noteAccounts } from '~/utils/notes'
 import { validateDocuments, type FinanceBackup } from '~/utils/backup'
 const user = useSupabaseUser()
@@ -113,7 +114,7 @@ onBeforeUnmount(() => { window.removeEventListener('beforeunload', beforeUnload)
         </section>
         <div class="preferences-grid">
           <section id="tampilan" class="settings-card"><div class="section-heading"><span class="material-symbols-outlined" aria-hidden="true">palette</span><div><h3>Tampilan</h3><p>Tema tersimpan untuk akun ini.</p></div></div><label>Tema aplikasi<select v-model="draft.theme"><option value="system">Ikuti perangkat</option><option value="light">Terang</option><option value="dark">Gelap</option></select></label><p class="hint">Bahasa Indonesia · Mata uang Rupiah</p></section>
-          <section id="pengingat" class="settings-card"><div class="section-heading"><span class="material-symbols-outlined" aria-hidden="true">notifications</span><div><h3>Pengingat</h3><p>Muncul saat aplikasi dibuka.</p></div></div><label class="check"><input v-model="draft.reminders.notes" type="checkbox">Ingatkan mencatat setiap hari</label><label>Waktu pengingat<input v-model="draft.reminders.time" type="time" required :disabled="!draft.reminders.notes"></label><label class="check"><input v-model="draft.reminders.savings" type="checkbox">Tampilkan pengingat menabung</label><p class="hint">Pengingat catatan berhenti setelah ada catatan hari ini. Jadwal menabung mengikuti setiap target. Tidak mengirim notifikasi saat aplikasi ditutup.</p></section>
+          <section id="pengingat" class="settings-card"><div class="section-heading"><span class="material-symbols-outlined" aria-hidden="true">notifications</span><div><h3>Pengingat</h3><p>Atur pengingat di aplikasi dan pada perangkatmu.</p></div></div><label class="check"><input v-model="draft.reminders.notes" type="checkbox">Ingatkan mencatat setiap hari</label><label>Waktu pengingat<input v-model="draft.reminders.time" type="time" required :disabled="!draft.reminders.notes"></label><label class="check"><input v-model="draft.reminders.savings" type="checkbox">Tampilkan pengingat menabung</label><p class="hint">Pengingat catatan berhenti setelah ada catatan hari ini. Jadwal menabung mengikuti setiap target.</p><PushReminderSettings :notes-enabled="data.reminders.notes" :unsaved="dirty" /></section>
         </div>
         <div class="settings-save"><p v-if="dirty">Ada perubahan yang belum disimpan.</p><div class="actions"><button class="secondary" type="button" @click="async () => { await refresh(); loadDraft() }">Muat ulang isian</button><button class="primary" :disabled="!dirty">Simpan Pengaturan</button></div></div>
       </fieldset>

@@ -5,6 +5,7 @@ import { maxNoteAmount, noteAccounts, noteCategories, validNoteDate, type MoneyN
 export interface MonthlyBudget { month: string; category: string; limit: number; defaultAccount?: string }
 export type BudgetMode = 'create' | 'update'
 export type BudgetStatus = 'safe' | 'near-limit' | 'reached' | 'exceeded'
+export type SaveBudget = (draft: MonthlyBudget, mode: BudgetMode) => void | Promise<void>
 
 export function budgetAccountError(draft: Pick<MonthlyBudget, 'limit' | 'defaultAccount'>, balances: Record<string, number>): string {
   if (!draft.defaultAccount || !Number.isSafeInteger(draft.limit) || draft.limit <= 0) return ''
@@ -15,19 +16,9 @@ export function budgetAccountError(draft: Pick<MonthlyBudget, 'limit' | 'default
   return 'Saldo ' + label + ' (' + formatRupiah(balance) + ') lebih kecil dari batas anggaran. Kurangi batas atau pilih dompet lain.'
 }
 
-export function requiredExpenseAccount(draft: Pick<NoteDraft, 'type' | 'category' | 'date'>, budgets: MonthlyBudget[]): string | undefined {
-  if (draft.type !== 'expense' || draft.category === 'other' || !validNoteDate(draft.date)) return undefined
-  return budgets.find(budget => budget.category === draft.category && budget.month === draft.date.slice(0, 7))?.defaultAccount
-}
-
-export function expenseBudgetError(draft: Pick<NoteDraft, 'type' | 'category' | 'date'>, budgets: MonthlyBudget[]): string {
-  if (draft.type !== 'expense' || !validNoteDate(draft.date)) return ''
-  const monthly = budgets.filter(budget => budget.month === draft.date.slice(0, 7))
-  if (!monthly.length) return 'Belum ada anggaran untuk bulan transaksi ini. Atur anggaran melalui menu Anggaran sebelum mencatat pengeluaran.'
-  if (draft.category && !monthly.some(budget => budget.category === draft.category)) {
-    return 'Kategori ini belum memiliki anggaran untuk bulan transaksi yang dipilih. Atur anggaran melalui menu Anggaran terlebih dahulu.'
-  }
-  return ''
+export function findExpenseBudget(draft: Pick<NoteDraft, 'type' | 'category' | 'date'>, budgets: MonthlyBudget[]): MonthlyBudget | undefined {
+  if (draft.type !== 'expense' || !validNoteDate(draft.date)) return undefined
+  return budgets.find(budget => budget.month === draft.date.slice(0, 7) && budget.category === draft.category)
 }
 
 export function validBudgetMonth(value: unknown): value is string {

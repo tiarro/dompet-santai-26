@@ -10,6 +10,7 @@ supabase/.temp/
 
 # Node dependencies
 node_modules
+public/ocr/
 
 # Browser test outputs
 test-results/

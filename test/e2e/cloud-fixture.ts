@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import type { Page } from '@playwright/test'
+import { mockNotificationReads } from './notification-read-fixture'
 
 type SnapshotPayload = Record<string, any>
 
@@ -151,6 +152,7 @@ async function mirrorPayload(page: Page, payload: SnapshotPayload, owner: string
 }
 
 export async function mockFinanceApi(page: Page, owner: string) {
+  await mockNotificationReads(page)
   const receipts = new Map<string, Buffer>()
   await page.route('**/rest/v1/rpc/get_finance_snapshot', async route => {
     try {

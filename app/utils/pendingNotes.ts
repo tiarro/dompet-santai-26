@@ -1,5 +1,4 @@
 import { categoryCatalog } from './categories'
-import { expenseBudgetError, requiredExpenseAccount } from './budgets'
 import { getSpendableBalances, isNoteDraft, localDate, type MoneyNote, type NoteDraft } from './notes'
 import type { CloudFinanceData } from '../composables/useCloudFinance'
 
@@ -26,10 +25,6 @@ export function pendingValidationError(note: MoneyNote, data: CloudFinanceData, 
   if (!isNoteDraft(note, catalog) || note.date > today) return 'Kategori atau isian catatan tidak lagi tersedia. Perbaiki catatan ini.'
   if (catalog[note.type].find(category => category.id === note.category)?.archived) return 'Kategori sudah diarsipkan. Pilih kategori aktif.'
   if (!data.settings.activeAccounts.includes(note.account)) return 'Dompet sudah dinonaktifkan. Pilih dompet aktif.'
-  const budgetError = expenseBudgetError(note, data.budgets)
-  if (budgetError) return budgetError
-  const required = requiredExpenseAccount(note, data.budgets)
-  if (required && required !== note.account) return 'Dompet anggaran berubah. Sesuaikan dompet pembayaran.'
   const balances = getSpendableBalances([...data.notes, note], today, data.savings.movements, data.settings.openingBalances)
   if (Object.values(balances).some(balance => !Number.isSafeInteger(balance) || balance < 0)) return 'Saldo terbaru tidak cukup atau melebihi batas. Perbaiki nominal atau dompet.'
   return ''

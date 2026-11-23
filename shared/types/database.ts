@@ -3,6 +3,24 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export interface Database {
   public: {
     Tables: {
+      push_subscriptions: {
+        Row: { id: string; user_id: string; endpoint: string; p256dh: string; auth: string; timezone: string; last_test_at: string | null; created_at: string }
+        Insert: Partial<Database['public']['Tables']['push_subscriptions']['Row']> & { user_id: string; endpoint: string; p256dh: string; auth: string; timezone: string }
+        Update: Partial<Database['public']['Tables']['push_subscriptions']['Row']>
+        Relationships: []
+      }
+      push_deliveries: {
+        Row: { subscription_id: string; reminder_date: string; status: 'sending' | 'sent' | 'failed' | 'skipped'; attempts: number; lease_token: string; retry_at: string; sent_at: string | null; last_status: number | null }
+        Insert: Partial<Database['public']['Tables']['push_deliveries']['Row']> & { subscription_id: string; reminder_date: string; status: 'sending' | 'sent' | 'failed' | 'skipped' }
+        Update: Partial<Database['public']['Tables']['push_deliveries']['Row']>
+        Relationships: []
+      }
+      notification_reads: {
+        Row: { user_id: string; read_key: string; read_at: string }
+        Insert: { user_id: string; read_key: string; read_at?: string }
+        Update: never
+        Relationships: []
+      }
       bill_reminders: {
         Row: { id: string; user_id: string; series_id: string; name: string; amount: number; estimated: boolean; due_on: string; recurrence: 'once' | 'monthly'; anchor_day: number; category_code: string; account_code: string; status: 'pending' | 'paid'; paid_at: string | null; revision: number; created_at: string }
         Insert: Partial<Database['public']['Tables']['bill_reminders']['Row']> & { user_id: string; name: string; amount: number; due_on: string; recurrence: 'once' | 'monthly'; anchor_day: number; category_code: string; account_code: string }
@@ -66,6 +84,7 @@ export interface Database {
     }
     Views: Record<string, never>
     Functions: {
+      claim_due_note_push: { Args: { p_now?: string; p_limit?: number }; Returns: { subscription_id: string; user_id: string; endpoint: string; p256dh: string; auth: string; reminder_date: string; lease_token: string; expires_at: string }[] }
       complete_bill_reminder: { Args: { bill_id: string; expected_revision: number }; Returns: Json }
       get_finance_snapshot: { Args: Record<string, never>; Returns: Json }
       replace_finance_snapshot: { Args: { payload: Json }; Returns: Json }

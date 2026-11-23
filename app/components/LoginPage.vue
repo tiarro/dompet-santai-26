@@ -143,6 +143,7 @@ const signInWithGoogle = async () => {
 };
 
 const sendPasswordReset = async () => {
+  if (isSendingReset.value) return;
   errorMessage.value = "";
   noticeMessage.value = "";
 
@@ -164,7 +165,7 @@ const sendPasswordReset = async () => {
 
     if (error) throw error;
     noticeMessage.value =
-      "Tautan pengaturan ulang kata sandi sudah dikirim ke email Anda.";
+      "Jika email terdaftar, tautan pengaturan ulang kata sandi akan dikirim. Periksa email dan buka tautan di browser yang sama.";
   } catch (error) {
     errorMessage.value = getErrorMessage(
       error,

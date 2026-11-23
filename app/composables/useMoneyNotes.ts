@@ -1,6 +1,5 @@
 import { defaultCategories, type CategoryCatalog } from '~/utils/categories'
-import { budgetAccountError, expenseBudgetError, requiredExpenseAccount } from '~/utils/budgets'
-import { getSpendableBalances, isNoteDraft, localDate, noteAccounts, reviseNote, type MoneyNote, type NoteDraft, type WalletTransfer } from '~/utils/notes'
+import { getSpendableBalances, isNoteDraft, localDate, reviseNote, type MoneyNote, type NoteDraft, type WalletTransfer } from '~/utils/notes'
 import { useCloudFinance } from './useCloudFinance'
 
 export function useMoneyNotes(getCategories: () => CategoryCatalog = () => defaultCategories) {
@@ -19,24 +18,12 @@ export function useMoneyNotes(getCategories: () => CategoryCatalog = () => defau
     if (!ready.value) throw new Error(storageError.value || 'Silakan masuk kembali sebelum menyimpan catatan.')
   }
 
-  function requireExpenseRules(draft: NoteDraft, enforceAccount = false) {
-    if (draft.type !== 'expense') return
-    const budgets = cloud.data.value.budgets
-    const error = expenseBudgetError(draft, budgets)
-    if (error) throw new Error(error)
-    const required = enforceAccount ? requiredExpenseAccount(draft, budgets) : undefined
-    if (required && draft.account !== required) {
-      throw new Error('Bayar dari harus mengikuti dompet anggaran terbaru. Pilih ulang kategori atau muat ulang halaman sebelum mencoba lagi.')
-    }
-  }
-
   async function save(draft: NoteDraft) {
     ensureReady()
     if (!cloud.online.value) return pending.enqueue(draft)
     today.value = localDate()
     if (!isNoteDraft(draft, getCategories()) || draft.date > today.value) throw new Error('Periksa kembali nominal, kategori, rekening, dan tanggal catatan.')
     if (!settings.value.activeAccounts.includes(draft.account)) throw new Error('Dompet sudah dinonaktifkan. Pilih dompet aktif.')
-    requireExpenseRules(draft, true)
     if (draft.type === 'expense' && draft.amount > (balances.value[draft.account] ?? 0)) {
       throw new Error('Saldo sumber uang tidak cukup. Kurangi nominal atau pilih sumber uang lain.')
     }
@@ -58,10 +45,6 @@ export function useMoneyNotes(getCategories: () => CategoryCatalog = () => defau
     today.value = localDate()
     if (!isNoteDraft(draft, getCategories()) || draft.date > today.value) throw new Error('Periksa kembali nominal, kategori, rekening, dan tanggal catatan.')
     const current = notes.value
-    if (!current.some(note => note.id === original.id) || JSON.stringify(current.find(note => note.id === original.id)) !== JSON.stringify(original)) {
-      throw new Error('Catatan sudah berubah. Muat ulang riwayat sebelum mencoba lagi.')
-    }
-    requireExpenseRules(draft)
     const next = reviseNote(current, original, { ...draft, description: draft.description.trim() }, today.value, getCategories(), transfers.value, openings.value)
     await cloud.save({ ...cloud.data.value, notes: next })
     return next.find(note => note.id === original.id)!
@@ -73,8 +56,6 @@ export function useMoneyNotes(getCategories: () => CategoryCatalog = () => defau
     const target = typeof idOrNote === 'string' ? original ?? notes.value.find(note => note.id === idOrNote) : idOrNote
     if (!target) throw new Error('Catatan tidak ditemukan. Periksa riwayat kembali.')
     const current = notes.value
-    const latest = current.find(note => note.id === target.id)
-    if (!latest || JSON.stringify(latest) !== JSON.stringify(target)) throw new Error('Catatan sudah berubah. Muat ulang riwayat sebelum mencoba lagi.')
     const next = reviseNote(current, target, null, today.value, getCategories(), transfers.value, openings.value)
     await cloud.save({ ...cloud.data.value, notes: next })
   }

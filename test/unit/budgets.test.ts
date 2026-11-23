@@ -1,18 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { requiredExpenseAccount, budgetAccountError, expenseBudgetError, budgetStatus, isMonthlyBudget, readBudgets, setBudget, summarizeBudgets, validBudgetMonth } from '../../app/utils/budgets'
+import { budgetAccountError, findExpenseBudget, budgetStatus, isMonthlyBudget, readBudgets, setBudget, summarizeBudgets, validBudgetMonth } from '../../app/utils/budgets'
 import type { MoneyNote } from '../../app/utils/notes'
 
 const budget = { month: '2026-10', category: 'food', limit: 100000 }
 const note: MoneyNote = { id: '1', type: 'expense', amount: 25000, category: 'food', account: 'cash', date: '2026-10-05', description: '', createdAt: '2026-10-05T12:00:00Z' }
 describe('monthly budgets', () => {
-  it('requires the budget wallet for new expenses except the Other category', () => {
+  it('looks up the suggested budget wallet by category and month, including Other', () => {
     const budgets = [{ ...budget, defaultAccount: 'bank' }, { ...budget, month: '2026-09', defaultAccount: 'ewallet' }]
-    expect(requiredExpenseAccount(note, budgets)).toBe('bank')
-    expect(requiredExpenseAccount({ ...note, date: '2026-09-30' }, budgets)).toBe('ewallet')
-    expect(requiredExpenseAccount(note, [budget])).toBeUndefined()
-    expect(requiredExpenseAccount({ ...note, category: 'other' }, [{ ...budget, category: 'other', defaultAccount: 'cash' }])).toBeUndefined()
-    expect(requiredExpenseAccount({ ...note, type: 'income' }, budgets)).toBeUndefined()
-    expect(requiredExpenseAccount({ ...note, category: 'custom-pets' }, [{ ...budget, category: 'custom-pets', defaultAccount: 'cash' }])).toBe('cash')
+    expect(findExpenseBudget(note, budgets)?.defaultAccount).toBe('bank')
+    expect(findExpenseBudget({ ...note, date: '2026-09-30' }, budgets)?.defaultAccount).toBe('ewallet')
+    expect(findExpenseBudget(note, [budget])?.defaultAccount).toBeUndefined()
+    expect(findExpenseBudget({ ...note, category: 'other' }, [{ ...budget, category: 'other', defaultAccount: 'cash' }])?.defaultAccount).toBe('cash')
+    expect(findExpenseBudget({ ...note, type: 'income' }, budgets)).toBeUndefined()
+    expect(findExpenseBudget({ ...note, category: 'custom-pets' }, [{ ...budget, category: 'custom-pets', defaultAccount: 'cash' }])?.defaultAccount).toBe('cash')
   })
   it('requires the selected wallet to cover a budget, including exact and zero balances', () => {
     const balances = { cash: 450000, bank: 6500000, ewallet: 1500000, savings: 0 }
@@ -26,14 +26,20 @@ describe('monthly budgets', () => {
     expect(budgetAccountError({ limit: 9000000 }, balances)).toBe('')
     expect(budgetAccountError({ limit: 1, defaultAccount: 'missing' }, balances)).toContain('belum tersedia')
   })
-  it('requires a budget for the expense category and transaction month, while allowing income', () => {
-    expect(expenseBudgetError(note, [])).toContain('Belum ada anggaran')
-    expect(expenseBudgetError(note, [{ ...budget, month: '2026-09' }])).toContain('Belum ada anggaran')
-    expect(expenseBudgetError(note, [{ ...budget, category: 'transport' }])).toContain('Kategori ini belum')
-    expect(expenseBudgetError(note, [budget])).toBe('')
-    expect(expenseBudgetError({ ...note, date: '2026-09-30' }, [budget])).toContain('Belum ada anggaran')
-    expect(expenseBudgetError({ ...note, type: 'income', category: 'salary' }, [])).toBe('')
-    expect(expenseBudgetError({ ...note, category: 'custom-pets' }, [{ ...budget, category: 'custom-pets' }])).toBe('')
+  it('finds an optional budget only for the expense category and transaction month', () => {
+    expect(findExpenseBudget(note, [])).toBeUndefined()
+    expect(findExpenseBudget(note, [{ ...budget, month: '2026-09' }])).toBeUndefined()
+    expect(findExpenseBudget(note, [{ ...budget, category: 'transport' }])).toBeUndefined()
+    expect(findExpenseBudget(note, [budget])).toEqual(budget)
+    expect(findExpenseBudget({ ...note, date: 'invalid' }, [budget])).toBeUndefined()
+    expect(findExpenseBudget({ ...note, type: 'income', category: 'salary' }, [])).toBeUndefined()
+    expect(findExpenseBudget({ ...note, category: 'custom-pets' }, [{ ...budget, category: 'custom-pets' }])?.category).toBe('custom-pets')
+  })
+  it('includes earlier unbudgeted expenses automatically when their budget is created', () => {
+    expect(summarizeBudgets([], [note], budget.month, note.date).unbudgetedSpent).toBe(note.amount)
+    const result = summarizeBudgets([budget], [note], budget.month, note.date)
+    expect(result.unbudgetedSpent).toBe(0)
+    expect(result.spent).toBe(note.amount)
   })
   it('accepts only valid months, expense categories and integer limits', () => {
     expect(isMonthlyBudget(budget)).toBe(true)

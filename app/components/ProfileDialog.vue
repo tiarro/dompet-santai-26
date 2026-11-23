@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import { clearDevicePush } from '~/utils/webPush'
 import { prepareProfilePhoto, profilePhotoAccept } from '~/utils/profilePhoto'
+import ProfileAvatar from './ProfileAvatar.vue'
 const props = defineProps<{ image: string; savePhoto: (photo: Blob) => Promise<void> }>()
 const user = useSupabaseUser()
 const session = useSupabaseSession()
@@ -74,6 +76,7 @@ async function logout() {
   busy.value = true
   logoutError.value = ''
   try {
+    await clearDevicePush()
     const { error: failure } = await supabase.auth.signOut({ scope: 'local' })
     // Supabase can clear the local session even when the logout endpoint fails.
     // Once cleared, finish navigating instead of leaving a signed-out panel open.
@@ -146,7 +149,7 @@ defineExpose({ open })
     </header>
     <div ref="content" class="profile-content">
       <div class="profile-photo">
-        <img :src="pendingPhoto?.preview || image" :alt="pendingPhoto ? 'Pratinjau foto profil' : 'Foto profil'" width="80" height="80">
+        <ProfileAvatar :src="pendingPhoto?.preview || image" :alt="pendingPhoto ? 'Pratinjau foto profil' : 'Foto profil'" width="80" height="80" />
         <input ref="photoInput" class="photo-input" type="file" :accept="profilePhotoAccept" aria-label="Pilih foto profil" :disabled="busy || processingPhoto || discarding || confirmingLogout" @change="choosePhoto">
         <div class="photo-actions"><button type="button" class="photo-button" :disabled="busy || processingPhoto || discarding || confirmingLogout" @click="photoInput?.click()">{{ processingPhoto ? 'Memproses foto...' : 'Ubah foto' }}</button><button v-if="pendingPhoto" type="button" class="photo-button" :disabled="busy || processingPhoto || discarding || confirmingLogout" @click="pendingPhoto = null; photoError = ''">Batalkan foto</button></div>
         <small>JPG, PNG, atau WebP, maksimal 10 MB.<br>Foto dipotong persegi otomatis.</small>
@@ -188,7 +191,7 @@ defineExpose({ open })
 </template>
 
 <style scoped>
-.profile-dialog { box-sizing: border-box; width: min(440px, calc(100vw - 2rem)); max-height: min(90dvh, 760px); padding: 0; border: 1px solid var(--line); border-radius: 1.5rem; background: var(--surface); color: var(--ink); box-shadow: 0 24px 80px rgb(0 0 0 / 20%); overflow: hidden; }
+.profile-dialog { box-sizing: border-box; width: min(32rem, calc(100vw - 2rem)); max-height: min(90dvh, 760px); padding: 0; border: 1px solid var(--line); border-radius: 1.5rem; background: var(--surface); color: var(--ink); box-shadow: 0 24px 80px rgb(0 0 0 / 20%); overflow: hidden; }
 .profile-dialog[open] { display: flex; flex-direction: column; animation: profile-enter .2s ease-out; }
 .profile-dialog::backdrop { background: rgb(0 0 0 / 45%); backdrop-filter: blur(4px); }
 .profile-header { flex: none; display: flex; align-items: center; justify-content: space-between; padding: .85rem 1.5rem; border-bottom: 1px solid color-mix(in srgb, var(--ink) 18%, var(--surface)); background: var(--surface); }
@@ -232,7 +235,7 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 .logout-confirmation { font-size: .85rem; line-height: 1.6; }.logout-actions { display: flex; gap: .5rem; }
 button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 3px solid var(--teal); outline-offset: 3px; }
 @keyframes profile-enter { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-@media (max-width: 600px) { .profile-dialog { box-sizing: border-box; width: 100%; max-width: 100%; margin: auto 0 0; max-height: 92dvh; border-radius: 1.5rem 1.5rem 0 0; border-bottom: 0; }.profile-content { padding-bottom: max(1.5rem, env(safe-area-inset-bottom)); } }
+@media (max-width: 640px) { .profile-dialog { box-sizing: border-box; width: 100%; margin: auto 0 0; max-height: 92dvh; border-radius: 1.5rem 1.5rem 0 0; border-bottom: 0; }.profile-content { padding-bottom: max(1.5rem, env(safe-area-inset-bottom)); } }
 @media (prefers-reduced-motion: reduce) { .profile-dialog[open] { display: flex; flex-direction: column; animation: none; } }
 </style>
 

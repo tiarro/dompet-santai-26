@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import ProfileDialog from '~/components/ProfileDialog.vue';
+import ProfileAvatar from '~/components/ProfileAvatar.vue';
 import SavingsOverview from '~/components/SavingsOverview.vue';
 import SettingsOverview from '~/components/SettingsOverview.vue';
 import { notesReminderDue } from '~/utils/settings';
@@ -45,11 +46,18 @@ const savingsSummary = computed(() => summarizeSavings(savingsData.value, today.
 const homeSavings = computed(() => [...savingsSummary.value.goals].sort((a, b) => Number(a.archived) - Number(b.archived) || b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id)));
 const receiptViewer = ref<InstanceType<typeof ReceiptViewer> | null>(null);
 const noteDialog = ref<InstanceType<typeof AddNoteDialog> | null>(null);
+const reminderRoute = useRoute();
+watch(() => [ready.value, noteDialog.value, reminderRoute.query.pengingat] as const, async ([loaded, dialog, reminder]) => {
+  if (!import.meta.client || !loaded || !dialog || reminder !== 'catatan') return;
+  dialog.open();
+  const query = { ...reminderRoute.query }; delete query.pengingat;
+  await navigateTo({ path: reminderRoute.path, query }, { replace: true });
+}, { flush: 'post' });
 const user = useSupabaseUser();
 const notificationOwner = computed(() => user.value?.sub ?? '');
 const billStore = useBills();
 const notificationPanel = ref<InstanceType<typeof NotificationPanel> | null>(null);
-const { read: readNotifications, mark: markNotifications, storageWarning: notificationStorageWarning } = useNotificationRead(notificationOwner);
+const { read: readNotifications, mark: markNotifications, storageWarning: notificationStorageWarning, loading: notificationReadLoading, error: notificationReadError, refresh: refreshNotificationRead } = useNotificationRead(notificationOwner);
 const { image: profileImage, savePhoto } = useProfilePhoto(defaultProfileImage);
 const profileDialog = ref<InstanceType<typeof ProfileDialog> | null>(null);
 const totalBalance = computed(() => Object.values(balances.value).reduce((sum, value) => sum + value, 0) + reservedSavings(transfers.value, today.value));
@@ -74,14 +82,15 @@ const notifications = computed(() => buildNotifications({
   savingsReady: savingsReady.value && !savingsError.value,
 }));
 const unreadNotifications = computed(() => notifications.value.filter(item => !readNotifications.value.includes(item.readKey)).length);
-const notificationLoading = computed(() => billStore.loading.value || (!ready.value && !storageError.value));
+const notificationLoading = computed(() => notificationReadLoading.value || billStore.loading.value || (!ready.value && !storageError.value));
 const notificationWarning = computed(() => [
+  notificationReadError.value,
   billStore.error.value ? 'Pengingat tagihan belum bisa dimuat.' : '',
   storageError.value || budgetError.value || savingsError.value || categoriesError.value ? 'Sebagian pengingat keuangan belum bisa dimuat.' : '',
 ].filter(Boolean).join(' '));
 const { refresh: refreshFinance } = useSettings();
-function refreshNotifications() { void billStore.refresh(); void refreshFinance(); }
-function openNotifications() { syncReminderClock(); notificationPanel.value?.open(); void billStore.refresh(); }
+function refreshNotifications() { void billStore.refresh(); void refreshFinance(); void refreshNotificationRead(); }
+function openNotifications() { syncReminderClock(); notificationPanel.value?.open(); void billStore.refresh(); void refreshNotificationRead(); }
 async function selectNotification(item: FinanceNotification) {
   markNotifications([item]);
   if (item.kind === 'note') { noteDialog.value?.open(); return; }
@@ -185,7 +194,7 @@ const desktopNavigation = [
     <h1 data-testid="page-title" class="sr-only">Dompet Santai</h1>
     <header class="topbar" :class="{ 'topbar--scrolled': navScrolled }">
       <div class="user-greeting">
-        <button class="profile-trigger" type="button" aria-label="Edit profil" aria-haspopup="dialog" @click="profileDialog?.open()"><img class="avatar" :src="profileImage" alt="Foto profil" /></button>
+        <button class="profile-trigger" type="button" aria-label="Edit profil" aria-haspopup="dialog" @click="profileDialog?.open()"><ProfileAvatar class="avatar" :src="profileImage" alt="Foto profil" /></button>
       </div>
       <div class="topbar__actions">
         <ThemeToggle /><button
@@ -201,7 +210,7 @@ const desktopNavigation = [
 
     <aside class="desktop-sidebar" aria-label="Navigasi desktop">
       <div class="desktop-sidebar__brand">
-        <button class="profile-trigger" type="button" aria-label="Edit profil" aria-haspopup="dialog" @click="profileDialog?.open()"><img :src="profileImage" alt="Foto profil" /></button>
+        <button class="profile-trigger" type="button" aria-label="Edit profil" aria-haspopup="dialog" @click="profileDialog?.open()"><ProfileAvatar :src="profileImage" alt="Foto profil" /></button>
         <div>
           <strong>Dompet Santai</strong>
         </div>
@@ -414,7 +423,7 @@ const desktopNavigation = [
     <NotificationPanel ref="notificationPanel" :items="notifications" :read="readNotifications" :owner="notificationOwner" :loading="notificationLoading" :warning="notificationWarning" :storage-warning="notificationStorageWarning" @select="selectNotification" @mark-all="markNotifications(notifications)" @settings="navigateTo('/pengaturan#pengingat')" @refresh="refreshNotifications" />
     <ProfileDialog ref="profileDialog" :image="profileImage" :save-photo="savePhoto" />
     <ReceiptViewer ref="receiptViewer" />
-    <AddNoteDialog ref="noteDialog" :save="save" :update="update" :ready="ready && categoriesReady" :catalog="catalog" :save-category="saveCategory" :categories-ready="categoriesReady" :accounts="accounts" :default-account="latestAccount" :budgets="monthlyBudgets" :budgets-ready="budgetsReady" :budget-error="budgetError" :notes="notes" :transfers="transfers" :openings="openings" :active-accounts="settings.activeAccounts" @saved="saved" @updated="updated" />
+    <AddNoteDialog ref="noteDialog" :save="save" :update="update" :ready="ready && categoriesReady" :catalog="catalog" :save-category="saveCategory" :categories-ready="categoriesReady" :accounts="accounts" :default-account="latestAccount" :budgets="monthlyBudgets" :save-budget="saveBudget" :budgets-ready="budgetsReady" :budget-error="budgetError" :notes="notes" :transfers="transfers" :openings="openings" :active-accounts="settings.activeAccounts" @saved="saved" @updated="updated" />
     <div v-if="toast && !historyPage" class="note-toast">
       <div class="note-toast__row">
         <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>

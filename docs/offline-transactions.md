@@ -11,7 +11,7 @@ Antrean tampil pada kartu **Catatan belum tersinkron**, terpisah dari saldo dan 
 - **Perlu diperbaiki**: validasi terhadap data terbaru gagal. Alasan ditampilkan; pengguna dapat memperbaiki atau menghapus catatan yang belum dikirim.
 - Jika respons pengiriman hilang, catatan tetap tersimpan. Edit/hapus ditahan sampai status pengiriman dapat dipastikan untuk menghindari perubahan pada transaksi yang mungkin sudah masuk ke server.
 
-Sinkronisasi berjalan saat koneksi kembali, akun/data siap, jendela kembali aktif, dan setiap 15 detik selama aplikasi terbuka dan terlihat. Tombol **Sinkronkan sekarang** juga mencoba ulang catatan yang perlu diperbaiki. Saldo, kategori aktif, dompet aktif, anggaran bulan transaksi, dan dompet pembayaran anggaran selalu diperiksa kembali. Catatan yang gagal tidak dihapus.
+Sinkronisasi berjalan saat koneksi kembali, akun/data siap, jendela kembali aktif, dan setiap 15 detik selama aplikasi terbuka dan terlihat. Tombol **Sinkronkan sekarang** juga mencoba ulang catatan yang perlu diperbaiki. Saldo, kategori aktif, dan dompet aktif selalu diperiksa kembali. Anggaran bersifat opsional: catatan tanpa anggaran tetap dapat disinkronkan dan masuk kelompok Pengeluaran tanpa anggaran. Sinkronisasi mempertahankan dompet pembayaran pada catatan meskipun berbeda dari default anggaran atau default berubah saat offline, selama dompet masih aktif dan saldo mencukupi. Catatan yang gagal tidak dihapus. Pembuatan anggaran langsung di form catatan hanya tersedia saat online.
 
 ## Penyimpanan dan integritas
 

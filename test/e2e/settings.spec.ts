@@ -4,10 +4,10 @@ import { expect, test, type Page } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
 const owner = '00000000-0000-4000-8000-000000000123'
 const key = (kind: string, id = owner) => 'dompet-santai-' + kind + '-v1:' + id
-async function signIn(page: Page, id = owner, username = 'Rani', now?: Date) {
+async function signIn(page: Page, id = owner, username = 'Rani', now?: Date, avatarUrl?: string) {
   await mockFinanceApi(page, id)
   await page.route('**/rest/v1/bill_reminders*', route => route.fulfill({ json: [] }))
-  const user = { id, aud: 'authenticated', role: 'authenticated', email: 'settings@example.com', app_metadata: {}, user_metadata: { username }, created_at: '2026-01-01T00:00:00Z' }
+  const user = { id, aud: 'authenticated', role: 'authenticated', email: 'settings@example.com', app_metadata: {}, user_metadata: { username, ...(avatarUrl ? { avatar_url: avatarUrl } : {}) }, created_at: '2026-01-01T00:00:00Z' }
   const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url')
   const token = () => encode({ alg: 'HS256', typ: 'JWT' }) + '.' + encode({ sub: id, aud: 'authenticated', role: 'authenticated', email: user.email, user_metadata: user.user_metadata, exp: Math.floor((now?.getTime() ?? Date.now()) / 1000) + 3600, iat: Math.floor((now?.getTime() ?? Date.now()) / 1000) }) + '.' + Buffer.from('test-signature').toString('base64url')
   await page.route('**/api/profile/photo', route => route.fulfill({ status: 404, json: { message: 'No photo' } }))
@@ -189,6 +189,8 @@ test('notification center prioritizes paginates remembers reads and opens relate
   await expect(bell.locator('.notification-badge')).toHaveText('9')
   await bell.click()
   const panel = page.getByRole('dialog', { name: 'Notifikasi' })
+  await expect(panel.getByRole('heading', { level: 2 })).toHaveText('Notifikasi')
+  await expect(panel.getByRole('button', { name: 'Semua 9', exact: true })).toBeVisible()
   await expect(panel.locator('.notification-item')).toHaveCount(5)
   await expect(panel.locator('.notification-item').first()).toContainText('Terlambat 2 hari')
   await page.screenshot({ path: 'test-results/notifications-desktop-dark.png', animations: 'disabled' })
@@ -213,7 +215,7 @@ test('notification center prioritizes paginates remembers reads and opens relate
   await page.getByRole('button', { name: 'Masuk ke Dompet Santai', exact: true }).click()
   await expect(page.getByTestId('page-title')).toHaveText('Dompet Santai')
   await bell.click()
-  await expect(panel.locator('.heading-count')).toHaveText('9')
+  await expect(panel.getByRole('button', { name: 'Semua 9', exact: true })).toBeVisible()
   await expect(panel.locator('.unread-dot')).toHaveCount(0)
   await panel.locator('.notification-item').first().click()
   const billEditor = page.getByRole('dialog', { name: 'Ubah tagihan', exact: true })
@@ -249,7 +251,7 @@ test('notification center prioritizes paginates remembers reads and opens relate
   rows = []
   await page.evaluate(() => window.dispatchEvent(new Event('focus')))
   await bell.click()
-  await expect(panel.locator('.heading-count')).toHaveText('3')
+  await expect(panel.getByRole('button', { name: 'Semua 3', exact: true })).toBeVisible()
   await panel.getByRole('button', { name: 'Pengaturan pengingat' }).click()
   await expect(page).toHaveURL(/pengaturan#pengingat/)
   await expect.poll(() => page.evaluate(() => document.body.style.overflow)).not.toBe('hidden')
@@ -275,15 +277,9 @@ test('notifications handle unavailable bills and isolate read markers between ac
   await bell.click()
   await expect(panel.locator('.unread-dot')).toHaveCount(1)
   await expect(panel).toContainText('Listrik akun lain')
-  await page.evaluate(() => {
-    const original = Storage.prototype.setItem
-    Storage.prototype.setItem = function(key, value) {
-      if (key.startsWith('dompet-santai-notifications-v1:')) throw new DOMException('Storage blocked', 'QuotaExceededError')
-      original.call(this, key, value)
-    }
-  })
+  await page.evaluate(() => { IDBFactory.prototype.open = () => { throw new DOMException('Storage blocked', 'QuotaExceededError') } })
   await panel.getByRole('button', { name: 'Tandai semua dibaca' }).click()
-  await expect(panel).toContainText('Status baca hanya tersimpan selama sesi ini.')
+  await expect(panel).toContainText('Status baca yang belum tersinkron hanya tersimpan selama sesi ini.')
   await expect(panel.locator('.unread-dot')).toHaveCount(0)
 })
 
@@ -304,9 +300,8 @@ async function seedPendingBudget(page: Page) {
     if (!localStorage.getItem(key)) localStorage.setItem(key, JSON.stringify([{ category: 'food', month, limit: 1000000 }]))
   }, owner)
 }
-test('offline transactions persist without changing balances and synchronize once after reconnect', async ({ page, context }) => {
+test('offline transactions without budgets persist without changing balances and synchronize once after reconnect', async ({ page, context }) => {
   test.setTimeout(60000)
-  await seedPendingBudget(page)
   await signIn(page)
   await page.addStyleTag({ content: '#nuxt-devtools-container { display:none !important }' })
   const before = await page.locator('.summary-card__value').allTextContents()
@@ -331,6 +326,7 @@ test('offline transactions persist without changing balances and synchronize onc
   await page.evaluate(() => window.dispatchEvent(new Event('online')))
   await expect(page.locator('.saved-note').filter({ hasText: 'Makan offline' })).toHaveCount(1)
   expect(writes).toBe(1)
+  expect(await page.evaluate(id => JSON.parse(localStorage.getItem('dompet-santai-budgets-v1:' + id) ?? '[]').length, owner)).toBe(0)
 })
 
 test('offline transactions survive reload and account changes then allow correction against latest balances', async ({ page, context }) => {
@@ -432,7 +428,7 @@ test('offline transactions synchronize from two tabs without duplicate writes', 
   await expect(page.locator('.saved-note').filter({ hasText: 'Dua tab satu transaksi' })).toHaveCount(1)
 })
 
-test('offline transactions retain receipt photos until upload and reject changed budgets', async ({ page, context }) => {
+test('offline transactions retain receipt photos until upload and keep actual wallets when budget defaults change', async ({ page, context }) => {
   test.setTimeout(60000)
   await seedPendingBudget(page)
   await signIn(page)
@@ -453,20 +449,15 @@ test('offline transactions retain receipt photos until upload and reject changed
   await expect(dialog.locator('.receipt-preview')).toBeVisible()
   await dialog.getByRole('button', { name: 'Simpan ke Antrean' }).click()
   await expect(dialog).not.toBeVisible()
-  await page.evaluate(id => localStorage.setItem('dompet-santai-budgets-v1:' + id, '[]'), owner)
-  await context.setOffline(false)
-  const queue = page.getByRole('region', { name: /Catatan belum tersinkron/ })
-  await expect(queue).toContainText('Belum ada anggaran', { timeout: 20000 })
-  await queue.getByRole('button', { name: 'Perbaiki', exact: true }).click()
-  const edit = page.getByRole('dialog', { name: 'Perbaiki Catatan Tertunda' })
-  await expect(edit.locator('.receipt-preview')).toBeVisible()
-  await edit.getByRole('button', { name: 'Tutup ubah catatan', exact: true }).click()
   await page.evaluate(id => {
     const now = new Date(), month = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0')
-    localStorage.setItem('dompet-santai-budgets-v1:' + id, JSON.stringify([{ month, category: 'food', limit: 1000000 }]))
+    localStorage.setItem('dompet-santai-budgets-v1:' + id, JSON.stringify([{ month, category: 'food', limit: 1000000, defaultAccount: 'bank' }]))
   }, owner)
-  await queue.getByRole('button', { name: 'Sinkronkan sekarang' }).click()
+  await context.setOffline(false)
+  const queue = page.getByRole('region', { name: /Catatan belum tersinkron/ })
   await expect(queue).not.toBeVisible({ timeout: 20000 })
+  expect(await page.evaluate(id => JSON.parse(localStorage.getItem('dompet-santai-notes-v1:' + id)!)[0].account, owner)).toBe('cash')
+  expect(await page.evaluate(id => JSON.parse(localStorage.getItem('dompet-santai-budgets-v1:' + id)!)[0].defaultAccount, owner)).toBe('bank')
   const row = page.locator('.saved-note').filter({ hasText: 'Struk lokal' })
   await expect(row).toHaveCount(1)
   await row.getByRole('button', { name: 'Lihat struk' }).click()
@@ -622,6 +613,59 @@ test('settings balances persist and protect savings, wallet deactivation and bud
   await page.reload(); await signIn(page); await openSettings(page)
   await expect(page.getByLabel('Saldo awal Tunai (Rp)', { exact: true })).toHaveValue('30')
 })
+test('web push settings opt in test disable and handle denied permission', async ({ page }) => {
+  test.setTimeout(60000)
+  await page.addInitScript(() => {
+    let permission = 'default', active = false
+    const state = { permissionRequests: 0, subscriptions: 0, owner: '' }
+    ;(window as any).pushTest = state
+    Object.defineProperty(Notification, 'permission', { configurable: true, get: () => permission })
+    Notification.requestPermission = async () => { state.permissionRequests++; return permission = 'granted' as NotificationPermission }
+    const subscription = { endpoint: 'https://fcm.googleapis.com/fcm/send/browser-test',
+      toJSON: () => ({ endpoint: subscription.endpoint, keys: { p256dh: 'B'.repeat(87), auth: 'A'.repeat(22) } }),
+      unsubscribe: async () => { active = false; return true } }
+    const registration = { active: { postMessage: (message: any, ports: MessagePort[]) => { state.owner = message.owner; ports[0]!.postMessage({ saved: true }) } },
+      pushManager: { getSubscription: async () => active ? subscription : null,
+        subscribe: async () => { active = true; state.subscriptions++; return subscription } }, getNotifications: async () => [] }
+    Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: { getRegistration: async () => registration, register: async () => registration } })
+    ;(window as any).denyPush = () => {
+      permission = 'denied'
+      Notification.requestPermission = async () => { state.permissionRequests++; return 'denied' }
+    }
+  })
+  let subscribed = false, tests = 0
+  await page.route('**/functions/v1/daily-reminders', async route => {
+    const body = route.request().postDataJSON()
+    if (body.action === 'subscribe') {
+      expect(body.timezone).toBeTruthy(); expect(body.user_id).toBeUndefined(); subscribed = true
+    }
+    if (body.action === 'unsubscribe') subscribed = false
+    if (body.action === 'test') tests++
+    await route.fulfill({ json: { configured: true, publicKey: 'B'.repeat(87), enabled: subscribed, accepted: true } })
+  })
+  await signIn(page); await openSettings(page)
+  const push = page.getByLabel('Notifikasi perangkat', { exact: true })
+  await expect(push.getByRole('button', { name: 'Aktifkan notifikasi perangkat' })).toBeDisabled()
+  await page.getByLabel('Ingatkan mencatat setiap hari').check()
+  await saveSettings(page)
+  expect(await page.evaluate(() => (window as any).pushTest.permissionRequests)).toBe(0)
+  await push.getByRole('button', { name: 'Aktifkan notifikasi perangkat' }).click()
+  await expect(push).toContainText('Notifikasi perangkat aktif.')
+  expect(subscribed).toBe(true)
+  expect(await page.evaluate(() => (window as any).pushTest.owner)).toBe(owner)
+  await push.getByRole('button', { name: 'Kirim notifikasi uji' }).click()
+  await expect(push).toContainText('Notifikasi uji dikirim.')
+  expect(tests).toBe(1)
+  await push.getByRole('button', { name: 'Nonaktifkan perangkat ini' }).click()
+  await expect(push).toContainText('Notifikasi pada perangkat ini dinonaktifkan.')
+  expect(subscribed).toBe(false)
+  expect(await page.evaluate(() => (window as any).pushTest.owner)).toBe('')
+  await page.evaluate(() => (window as any).denyPush())
+  await push.getByRole('button', { name: 'Aktifkan notifikasi perangkat' }).click()
+  await expect(push.getByRole('alert')).toContainText('Izin notifikasi belum diberikan')
+  expect(await page.evaluate(() => (window as any).pushTest.subscriptions)).toBe(1)
+})
+
 test('settings supports mobile themes, system changes, reminders and account isolation', async ({ page }) => {
   test.setTimeout(60000)
   await page.setViewportSize({ width: 390, height: 844 })
@@ -713,7 +757,7 @@ test('settings detects stale settings and data changed after restore preview acr
   await other.getByLabel('Saldo awal Tunai (Rp)', { exact: true }).fill('200000')
   await saveSettings(other)
   await page.getByRole('button', { name: 'Simpan Pengaturan', exact: true }).click()
-  await expect(page.locator('.settings-page > [role=alert]')).toContainText('berubah di tab lain')
+  await expect(page.locator('.settings-page > [role=alert]').filter({ hasText: 'berubah di perangkat lain' }).first()).toBeVisible()
   await page.getByRole('button', { name: 'Muat ulang isian' }).click()
   await expect(page.getByLabel('Saldo awal Tunai (Rp)', { exact: true })).toHaveValue('200000')
   const raw = await exportBackup(page)
@@ -721,7 +765,10 @@ test('settings detects stale settings and data changed after restore preview acr
   await other.getByLabel('Saldo awal Tunai (Rp)', { exact: true }).fill('300000'); await saveSettings(other)
   const dialog = page.getByRole('dialog', { name: 'Pulihkan backup' })
   await dialog.getByRole('button', { name: 'Ya, Pulihkan Backup' }).click()
-  await expect(dialog.getByRole('alert')).toContainText('Data berubah sejak konfirmasi')
+  // Either the refreshed client snapshot or the server fingerprint can detect
+  // this conflict. Both must reject restore and preserve the newer balance.
+  await expect(dialog.getByRole('alert')).toContainText(/Data (?:berubah sejak konfirmasi|cloud berubah di perangkat lain)/)
+  expect(await page.evaluate(storageKey => JSON.parse(localStorage.getItem(storageKey)!).openingBalances.cash, key('settings'))).toBe(300000)
   await other.close()
 })
 test('settings edits name bio and gender from the avatar on mobile and desktop', async ({ page }) => {
@@ -1003,6 +1050,33 @@ test('profile photo validates files, supports cancellation, and preserves a fail
   await page.route('**/api/profile/photo', route => route.fulfill({ json: { saved: true } }))
   await dialog.getByRole('button', { name: 'Simpan Profil' }).click()
   await expect(dialog.getByRole('status')).toHaveText('Profil berhasil disimpan.')
+})
+
+test('profile photo falls back when Google images fail on desktop, mobile and in the editor', async ({ page }) => {
+  await page.route('https://lh3.googleusercontent.com/**', route => route.abort())
+  await signIn(page, owner, 'Rani', undefined, 'https://lh3.googleusercontent.com/a/unavailable-photo')
+  await page.addStyleTag({ content: '#nuxt-devtools-container { display:none !important }' })
+  for (const width of [1280, 390]) {
+    await page.setViewportSize({ width, height: 844 })
+    const trigger = page.getByRole('button', { name: 'Edit profil', exact: true }).filter({ visible: true })
+    const avatar = trigger.getByRole('img')
+    await expect(avatar).toHaveAttribute('src', '/avatar-default.svg')
+    await expect.poll(() => avatar.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true)
+    await trigger.click()
+    const dialog = page.getByRole('dialog', { name: 'Edit profil', exact: true })
+    await expect(dialog.getByAltText('Foto profil', { exact: true })).toHaveAttribute('src', '/avatar-default.svg')
+    await expect.poll(() => dialog.getByAltText('Foto profil', { exact: true }).evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true)
+    await dialog.getByRole('button', { name: 'Tutup edit profil' }).click()
+  }
+  await page.route('**/api/profile/photo', route => route.fulfill({ json: { saved: true } }))
+  await page.getByRole('button', { name: 'Edit profil', exact: true }).filter({ visible: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Edit profil', exact: true })
+  await dialog.getByLabel('Pilih foto profil', { exact: true }).setInputFiles(await profilePhotoFile(page))
+  await dialog.getByRole('button', { name: 'Simpan Profil', exact: true }).click()
+  await expect(dialog.getByRole('status')).toHaveText('Profil berhasil disimpan.')
+  await expect(dialog.getByAltText('Foto profil', { exact: true })).toHaveJSProperty('naturalWidth', 512)
+  await dialog.getByRole('button', { name: 'Tutup edit profil' }).click()
+  await expect(page.locator('.topbar .avatar')).toHaveJSProperty('naturalWidth', 512)
 })
 
 test('profile photo API refuses anonymous reads and writes', async ({ request }) => {

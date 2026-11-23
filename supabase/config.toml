@@ -1,0 +1,5 @@
+project_id = "dompet-santai"
+
+[functions.daily-reminders]
+# The handler verifies user JWTs itself and uses a separate cron secret.
+verify_jwt = false
