@@ -12,13 +12,12 @@ function fixture(): CloudFinanceData {
 }
 const note: MoneyNote = { id: 'stable-id', createdAt: '2026-10-15T00:00:00Z', type: 'expense', amount: 25000, category: 'food', account: 'cash', date: '2026-10-15', description: 'Makan' }
 describe('pending transaction validation', () => {
-  it('allows a structurally valid offline draft before checking current budget and balance at sync', () => {
+  it('allows unbudgeted offline drafts and checks the current balance at sync', () => {
     const data = fixture()
     data.budgets = []
-    data.settings.openingBalances.cash = 0
     expect(() => validatePendingDraft(note, data, '2026-10-15')).not.toThrow()
-    expect(pendingValidationError(note, data, '2026-10-15')).toContain('Belum ada anggaran')
-    data.budgets = fixture().budgets
+    expect(pendingValidationError(note, data, '2026-10-15')).toBe('')
+    data.settings.openingBalances.cash = 0
     expect(pendingValidationError(note, data, '2026-10-15')).toContain('Saldo terbaru tidak cukup')
   })
   it('uses the newest ledger, savings reservations and active wallet rules', () => {
@@ -32,10 +31,11 @@ describe('pending transaction validation', () => {
     data.settings.activeAccounts = ['bank']
     expect(pendingValidationError(note, data, '2026-10-15')).toContain('Dompet sudah dinonaktifkan')
   })
-  it('blocks archived categories, changed payment wallets, future dates and invalid money', () => {
+  it('keeps the actual payment wallet when budget defaults change and blocks invalid notes', () => {
     const data = fixture()
     data.budgets[0]!.defaultAccount = 'bank'
-    expect(pendingValidationError(note, data, '2026-10-15')).toContain('Dompet anggaran berubah')
+    expect(pendingValidationError(note, data, '2026-10-15')).toBe('')
+    expect(note.account).toBe('cash')
     data.customCategories = [{ id: 'custom-a', type: 'expense', label: 'Custom', icon: 'category', archived: true }]
     expect(pendingValidationError({ ...note, category: 'custom-a' }, data, '2026-10-15')).toContain('diarsipkan')
     for (const patch of [{ amount: 0 }, { amount: 1.5 }, { date: '2026-10-16' }]) expect(() => validatePendingDraft({ ...note, ...patch }, data, '2026-10-15')).toThrow()

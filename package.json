@@ -3,12 +3,21 @@
   "type": "module",
   "private": true,
   "scripts": {
+    "prepare:ocr": "node scripts/prepare-ocr-assets.mjs",
+    "predev": "node scripts/prepare-ocr-assets.mjs",
+    "prebuild": "node scripts/prepare-ocr-assets.mjs",
+    "pregenerate": "node scripts/prepare-ocr-assets.mjs",
     "build": "nuxt build",
     "dev": "nuxt dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
-    "postinstall": "nuxt prepare",
+    "postinstall": "node scripts/prepare-ocr-assets.mjs && nuxt prepare",
     "test:unit": "vitest run --config vitest.config.ts",
+    "typecheck": "nuxt typecheck --checker vue-tsc",
+    "test:sql:notifications": "node test/sql/notification-reads.cjs",
+    "test:sql:push": "node test/sql/web-push.cjs",
+    "test:live:push": "node test/integration/web-push.mjs",
+    "test:live:notifications": "node test/integration/notification-reads.mjs",
     "test:unit:watch": "vitest --config vitest.config.ts",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui"
@@ -16,11 +25,15 @@
   "dependencies": {
     "@nuxtjs/supabase": "^2.0.9",
     "@supabase/supabase-js": "2.112.2",
+    "@tesseract.js-data/eng": "1.0.0",
+    "@tesseract.js-data/ind": "1.0.0",
     "nuxt": "^4.5.2",
+    "tesseract.js": "7.0.0",
     "vue": "^3.5.41",
     "vue-router": "^5.2.0"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.17",
     "@nuxt/test-utils": "^4.1.0",
     "@playwright/test": "^1.62.1",
     "@types/node": "^26.6.4",

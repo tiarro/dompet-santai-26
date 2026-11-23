@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { categoryIcons, type CategoryType, type CustomCategory, type SaveCategory } from '~/utils/categories'
-const props = defineProps<{ type: CategoryType; save: SaveCategory; ready: boolean }>()
+const props = defineProps<{ type: CategoryType; save: SaveCategory; ready: boolean; tile?: boolean }>()
 const emit = defineEmits<{ created: [category: CustomCategory]; dirty: [dirty: boolean]; editing: [editing: boolean] }>()
 const expanded = ref(false)
 const label = ref('')
@@ -37,7 +37,7 @@ defineExpose({ reset })
 </script>
 
 <template>
-  <section class="category-creator">
+  <section class="category-creator" :class="{ 'category-creator--tile': tile }">
     <button v-if="!expanded" ref="trigger" type="button" class="category-add" :disabled="!ready || saving" @click="open"><span class="material-symbols-outlined" aria-hidden="true">add_circle</span>Tambah Kategori</button>
     <div v-else class="category-fields">
       <h3>Kategori {{ type === 'expense' ? 'pengeluaran' : 'pemasukan' }} baru</h3>
@@ -57,6 +57,11 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; }
 .category-add { display: inline-flex; align-items: center; gap: .4rem; min-height: 2.5rem; padding: .4rem .6rem; color: var(--teal); background: transparent; border: 1px dashed var(--line); border-radius: .6rem; font-weight: 800; }
 .category-add .material-symbols-outlined { font-size: 1.1rem; }
+.category-creator--tile { display: contents; }
+.category-creator--tile .category-add { display: flex; flex-direction: column; justify-content: center; min-width: 0; min-height: 4.9rem; gap: .45rem; padding: .65rem .25rem; border-radius: .8rem; font-size: .71rem; }
+.category-creator--tile .category-add .material-symbols-outlined { font-size: 1.35rem; }
+.category-creator--tile .category-add:hover { border-color: var(--teal); background: var(--canvas); }
+.category-creator--tile .category-fields { grid-column: 1 / -1; min-width: 0; }
 .category-fields { padding: 1rem; border: 1px solid var(--line); border-radius: .8rem; background: var(--canvas); color: var(--ink); }
 h3 { margin: 0 0 1rem; font-size: .85rem; }
 .category-field { display: grid; gap: .45rem; margin-top: .8rem; }

@@ -1,4 +1,5 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './auth-fixture'
+import { mockFinanceApi } from './cloud-fixture'
 
 test.use({ viewport: { width: 390, height: 844 } })
 
@@ -7,6 +8,8 @@ for (const outcome of ['success', 'invalid-password', 'verification-failed'] as 
     // HTTP LAN origins cannot use WebCrypto for local JWT verification.
     await page.addInitScript(() => { Reflect.deleteProperty(Crypto.prototype, 'subtle') })
     const id = '00000000-0000-4000-8000-000000000123'
+    await mockFinanceApi(page, id)
+    await page.route('**/rest/v1/bill_reminders*', route => route.fulfill({ json: [] }))
     const user = { id, aud: 'authenticated', role: 'authenticated', email: 'login@example.com', app_metadata: {}, user_metadata: {}, created_at: '2026-01-01T00:00:00Z' }
     const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url')
     const token = encode({ alg: 'ES256', kid: 'test-key', typ: 'JWT' }) + '.' + encode({

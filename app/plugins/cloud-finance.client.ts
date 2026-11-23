@@ -10,7 +10,7 @@ export default defineNuxtPlugin(nuxtApp => {
   window.addEventListener('offline', connection)
   window.addEventListener('focus', refresh)
   document.addEventListener('visibilitychange', refresh)
-  nuxtApp.hook('app:beforeUnmount', () => {
+  nuxtApp.vueApp.onUnmount(() => {
     stop(); removeRouteHook()
     window.removeEventListener('online', connection)
     window.removeEventListener('offline', connection)

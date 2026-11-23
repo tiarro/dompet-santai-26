@@ -3,6 +3,7 @@ import { clientsClaim } from 'workbox-core'
 import { precacheAndRoute, cleanupOutdatedCaches, matchPrecache } from 'workbox-precaching'
 import { registerRoute, NavigationRoute } from 'workbox-routing'
 import { NetworkOnly } from 'workbox-strategies'
+import '../public/push-sw.js'
 
 declare const self: ServiceWorkerGlobalScope & { __WB_MANIFEST: Array<{ url: string; revision: string | null }> }
 self.skipWaiting()

@@ -48,6 +48,9 @@ export default defineNuxtConfig({
     includeAssets: ['offline.html', 'pwa.svg'],
     injectManifest: {
       globPatterns: ['**/*.{js,css,ico,png,svg,woff2}'],
+      // OCR is loaded on demand, rather than downloading every engine variant
+      // during PWA installation. These files contain no account data.
+      globIgnores: ['**/ocr/**', '**/receipt-ocr-worker.js'],
     },
     devOptions: {
       enabled: false,

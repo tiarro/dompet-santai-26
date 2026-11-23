@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './auth-fixture'
 
 for (const scenario of [
   { entry: 'login', profile: 'complete', destination: '/' },
@@ -40,6 +40,8 @@ for (const scenario of [
         }] })
       } else if (url.pathname.endsWith('/get_finance_snapshot')) {
         await route.fulfill({ json: { profile: { id }, settings: {}, wallets: [], categories: [], transactions: [], budgets: [], goals: [], movements: [], _meta: { fingerprint: 'test' } } })
+      } else if (['/bill_reminders', '/notification_reads'].some(path => url.pathname.endsWith(path)) && route.request().method() === 'GET') {
+        await route.fulfill({ json: [] })
       } else {
         forbiddenWrites.push(url.pathname)
         await route.fulfill({ status: 400, json: {} })

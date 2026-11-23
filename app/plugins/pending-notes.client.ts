@@ -12,7 +12,7 @@ export default defineNuxtPlugin(nuxtApp => {
   window.addEventListener('focus', refresh)
   window.addEventListener('online', refresh)
   const timer = setInterval(refresh, 15000)
-  nuxtApp.hook('app:beforeUnmount', () => {
+  nuxtApp.vueApp.onUnmount(() => {
     disposed = true; stop(); clearInterval(timer)
     window.removeEventListener('pending-notes-changed', changed)
     window.removeEventListener('focus', refresh)
